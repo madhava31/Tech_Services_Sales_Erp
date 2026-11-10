@@ -47,7 +47,7 @@ const monthsAhead = (n) => {
 
 before(async () => {
   server = await startTestServer();
-  ({ runDailyReminders } = await import('../api/crm/reminders.js'));
+  ({ runDailyReminders } = await import('../server/crm/reminders.js'));
   ravi = await signedInSalesperson(server.baseUrl, 'Ravi', createClient);
   priya = await signedInSalesperson(server.baseUrl, 'Priya', createClient);
   for (const [name, role] of [['manager', 'sales_manager'], ['office', 'office_staff'], ['admin', 'admin']]) await createUser(name, role);

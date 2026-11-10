@@ -6,8 +6,8 @@ export async function startTestServer() {
   // db/index.js reads DATABASE_URL at import time, so it must be set before the app is imported.
   process.env.DATABASE_URL = url;
   process.env.NODE_ENV = 'test';
-  const app = (await import('../../api/app.js')).default;
-  const db = (await import('../../api/db/index.js')).default;
+  const app = (await import('../../server/app.js')).default;
+  const db = (await import('../../server/db/index.js')).default;
 
   const server = await new Promise((resolve) => {
     const s = app.listen(0, '127.0.0.1', () => resolve(s));

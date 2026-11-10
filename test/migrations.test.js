@@ -10,8 +10,8 @@ import {
   assertSafeTarget,
   assertTestDatabaseUrl,
   createClient,
-} from '../api/db/migrate.js';
-import { sslConfig } from '../api/db/ssl.js';
+} from '../server/db/migrate.js';
+import { sslConfig } from '../server/db/ssl.js';
 import { resetTestDatabase, testDatabaseUrl, query } from './helpers/testDb.js';
 
 async function withClient(fn) {

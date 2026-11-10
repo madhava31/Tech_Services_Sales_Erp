@@ -16,12 +16,13 @@ let _pool = null;
 
 export function getPool() {
   if (!_pool) {
-    if (!process.env.DATABASE_URL) {
+    const connStr = process.env.DATABASE_URL || process.env.DATABASE_URL1 || process.env.POSTGRES_URL;
+    if (!connStr) {
       throw new Error("DATABASE_URL is not set. Copy .env.example to .env and point it at this app's own Postgres database.");
     }
     _pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: sslConfig(process.env.DATABASE_URL),
+      connectionString: connStr,
+      ssl: sslConfig(connStr),
     });
     _pool.on('error', (err) => {
       console.error('Postgres pool error (idle client):', err.message);

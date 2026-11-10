@@ -4,7 +4,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startTestServer, createClient } from './helpers/server.js';
 import { createSalesperson, createUser, login } from './helpers/fixtures.js';
-import { visibleSalespersonIds } from '../api/auth/roles.js';
+import { visibleSalespersonIds } from '../server/auth/roles.js';
 
 let server;
 const clients = {};

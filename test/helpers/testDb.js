@@ -3,7 +3,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
-import { assertTestDatabaseUrl, createClient, migrateLatest } from '../../api/db/migrate.js';
+import { assertTestDatabaseUrl, createClient, migrateLatest } from '../../server/db/migrate.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, '../../.env.test') });

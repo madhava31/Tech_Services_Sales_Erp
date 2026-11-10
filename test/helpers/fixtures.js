@@ -1,6 +1,6 @@
 // Direct-to-database fixtures, so tests can set up users and salespeople without going through
 // the API under test.
-import { hashPassword } from '../../api/auth/password.js';
+import { hashPassword } from '../../server/auth/password.js';
 import { query } from './testDb.js';
 
 export const PASSWORD = 'test-password';
@@ -24,7 +24,7 @@ export async function createUser(username, role, { salespersonId = null, manager
 }
 
 export async function createCompany(name, { city = null, createdBy, approvalStatus = 'approved' } = {}) {
-  const { normalizeCompanyName } = await import('../../api/crm/normalize.js');
+  const { normalizeCompanyName } = await import('../../server/crm/normalize.js');
   const [row] = await query(
     `INSERT INTO company (name, normalized_name, city, created_by, approval_status) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
     [name, normalizeCompanyName(name), city, createdBy, approvalStatus]
