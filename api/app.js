@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import db from './db/index.js';
 
 import { requireAuth, requireAdmin } from './auth/middleware.js';
 import authRouter from './routes/auth.js';
