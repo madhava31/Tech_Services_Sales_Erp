@@ -54,6 +54,14 @@ app.use(
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 
+// Support both /api/... and rewritten /... paths on serverless platforms (Vercel)
+app.use((req, res, next) => {
+  if (!req.url.startsWith('/api') && !req.url.startsWith('/favicon.ico')) {
+    req.url = '/api' + req.url;
+  }
+  next();
+});
+
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');

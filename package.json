@@ -11,7 +11,7 @@
     "start": "node api/index.js",
     "dev:api": "node --watch api/index.js",
     "dev:web": "npm --prefix web run dev",
-    "build": "npm --prefix web run build",
+    "build": "npm --prefix web run build && node -e \"import('node:fs').then(fs => fs.cpSync('web/dist', 'dist', { recursive: true }))\",
     "test": "node --test --test-concurrency=1 \"test/**/*.test.js\"",
     "typecheck": "npm --prefix web run typecheck",
     "db:migrate": "node api/db/migrate.js latest",
