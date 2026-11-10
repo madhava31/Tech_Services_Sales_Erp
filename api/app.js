@@ -56,6 +56,9 @@ app.use(cookieParser());
 
 // Support /api/... paths rewritten on serverless platforms (Vercel)
 app.use((req, res, next) => {
+  if (req.query && req.query.slug) {
+    delete req.query.slug;
+  }
   if (req.query && req.query.__path !== undefined) {
     let sub = String(req.query.__path || '');
     delete req.query.__path;
