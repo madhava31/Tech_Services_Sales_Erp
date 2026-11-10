@@ -83,8 +83,20 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/api/health', (req, res) => {
-  res.json({ ok: true });
+app.get('/api/health', async (req, res) => {
+  let dbOk = false;
+  let dbError = null;
+  try {
+    const row = await db.prepare('SELECT 1 as connected').get();
+    dbOk = Boolean(row?.connected);
+  } catch (err) {
+    dbError = err.message;
+  }
+  res.json({
+    ok: true,
+    database: dbOk,
+    ...(dbError ? { dbError } : {}),
+  });
 });
 
 app.use('/api/auth', authRouter);
