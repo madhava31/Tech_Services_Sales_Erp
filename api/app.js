@@ -54,10 +54,20 @@ app.use(
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 
-// Support both /api/... and rewritten /... paths on serverless platforms (Vercel)
+// Support /api/... paths rewritten on serverless platforms (Vercel)
 app.use((req, res, next) => {
-  if (!req.url.startsWith('/api') && !req.url.startsWith('/favicon.ico')) {
-    req.url = '/api' + req.url;
+  if (req.query && req.query.__path !== undefined) {
+    let sub = String(req.query.__path || '');
+    delete req.query.__path;
+    if (sub.startsWith('/')) sub = sub.slice(1);
+    const searchParams = new URLSearchParams(req.query).toString();
+    req.url = '/api/' + sub + (searchParams ? '?' + searchParams : '');
+  } else if (req.headers['x-forwarded-uri'] && req.headers['x-forwarded-uri'].startsWith('/api')) {
+    req.url = req.headers['x-forwarded-uri'];
+  } else if (req.headers['x-matched-path'] && req.headers['x-matched-path'].startsWith('/api')) {
+    req.url = req.headers['x-matched-path'];
+  } else if (!req.url.startsWith('/api') && !req.url.startsWith('/favicon.ico')) {
+    req.url = '/api' + (req.url.startsWith('/') ? req.url : '/' + req.url);
   }
   next();
 });
