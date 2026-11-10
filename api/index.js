@@ -11,8 +11,13 @@ const { startReminderSchedule } = await import('./crm/reminders.js');
 const { startErpSyncSchedule } = await import('./erp/sync.js');
 
 const PORT = Number(process.env.PORT) || 4100;
-app.listen(PORT, () => {
-  console.log(`Technicon Sales ERP API listening on http://localhost:${PORT}`);
-  startReminderSchedule();
-  startErpSyncSchedule();
-});
+
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`Technicon Sales ERP API listening on http://localhost:${PORT}`);
+    startReminderSchedule();
+    startErpSyncSchedule();
+  });
+}
+
+export default app;

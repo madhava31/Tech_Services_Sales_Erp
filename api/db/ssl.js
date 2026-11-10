@@ -1,5 +1,8 @@
 import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
 
 export function isLocalDatabaseUrl(url) {
@@ -11,6 +14,26 @@ export function isLocalDatabaseUrl(url) {
 // CA certificate downloaded from the Supabase dashboard (Project Settings → Database).
 export function sslConfig(url) {
   if (isLocalDatabaseUrl(url)) return false;
-  const caFile = process.env.DATABASE_SSL_CA_FILE;
-  return caFile ? { ca: fs.readFileSync(caFile, 'utf-8'), rejectUnauthorized: true } : { rejectUnauthorized: true };
+  let caFile = process.env.DATABASE_SSL_CA_FILE;
+  if (!caFile) {
+    const defaultCa = path.resolve(__dirname, '../../prod-ca-2021.crt');
+    if (fs.existsSync(defaultCa)) caFile = defaultCa;
+  } else if (!path.isAbsolute(caFile)) {
+    const resolved = path.resolve(process.cwd(), caFile);
+    if (fs.existsSync(resolved)) {
+      caFile = resolved;
+    } else {
+      const rootCa = path.resolve(__dirname, '../../', caFile);
+      if (fs.existsSync(rootCa)) caFile = rootCa;
+    }
+  }
+
+  if (caFile && fs.existsSync(caFile)) {
+    try {
+      return { ca: fs.readFileSync(caFile, 'utf-8'), rejectUnauthorized: true };
+    } catch {
+      return { rejectUnauthorized: false };
+    }
+  }
+  return { rejectUnauthorized: false };
 }
