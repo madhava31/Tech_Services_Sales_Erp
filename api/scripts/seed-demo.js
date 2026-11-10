@@ -153,7 +153,10 @@ const OPEN_STAGE_FLOW = ['new_prospect', 'visit_completed', 'qualified', 'quotat
 async function main() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error('DATABASE_URL is not set (.env).');
-  if (!isLocalDatabaseUrl(url)) throw new Error('Refusing: demo data is only for a local database.');
+  const allowRemote = process.argv.includes('--remote') || process.env.ALLOW_REMOTE_DEMO === '1';
+  if (!isLocalDatabaseUrl(url) && !allowRemote) {
+    throw new Error('Refusing: demo data is only for a local database, or pass --remote / set ALLOW_REMOTE_DEMO=1.');
+  }
 
   const client = createClient(url);
   await client.connect();

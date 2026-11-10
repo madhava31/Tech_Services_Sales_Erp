@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { api, Contact, DealInput, NamedOption, OpportunityDetail, Product } from '../lib/api';
+import { useAuth } from '../lib/auth';
 import { formatDate, formatMoney, formatIndianDigits } from '../lib/labels';
-import { PHONE_TOUCH, SelectField, TextAreaField, TextField } from './ui';
+import { canManageProducts } from '../lib/roles';
+import { Button, PHONE_TOUCH, SelectField, TextAreaField, TextField } from './ui';
 
 const NEW_CONTACT = 'new';
 export const WIN_PROBABILITIES = [25, 50, 75, 100];
@@ -128,10 +130,17 @@ export default function DealFields({
   onChange: (patch: Partial<DealDraft>) => void;
   keep?: Pick<OpportunityDetail, 'products' | 'segments' | 'oem_id' | 'oem_name'>;
 }) {
+  const { user } = useAuth();
+  const canManage = canManageProducts(user?.role);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [oems, setOems] = useState<NamedOption[]>([]);
   const [segments, setSegments] = useState<NamedOption[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [addingProduct, setAddingProduct] = useState(false);
+  const [newProductName, setNewProductName] = useState('');
+  const [newProductPartNumber, setNewProductPartNumber] = useState('');
+  const [newProductError, setNewProductError] = useState('');
+  const [newProductBusy, setNewProductBusy] = useState(false);
 
   useEffect(() => {
     api.companies.get(companyId).then((c) => setContacts(c.contacts)).catch(() => setContacts([]));
@@ -220,6 +229,74 @@ export default function DealFields({
             </>
           )}
         />
+        {value.oemId && (
+          <div className="mt-2">
+            {!addingProduct ? (
+              canManage ? (
+                <Button type="button" size="sm" variant="ghost" onClick={() => setAddingProduct(true)}>
+                  + Add product for this OEM
+                </Button>
+              ) : null
+            ) : (
+              <div className="p-3 border border-line rounded-lg bg-surface flex flex-col gap-2.5 mt-2">
+                <span className="text-xs font-semibold text-fg">
+                  Add product for {oems.find((o) => String(o.id) === value.oemId)?.name ?? 'OEM'}
+                </span>
+                {newProductError && <p className="text-xs text-danger">{newProductError}</p>}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <TextField
+                    label="Product name"
+                    value={newProductName}
+                    onChange={(e) => setNewProductName(e.target.value)}
+                    placeholder="e.g. Atomic Absorption Spec"
+                    required
+                  />
+                  <TextField
+                    label="Part number / Model"
+                    value={newProductPartNumber}
+                    onChange={(e) => setNewProductPartNumber(e.target.value)}
+                    placeholder="e.g. TS-PE-AAS-01"
+                    required
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={newProductBusy || !newProductName.trim() || !newProductPartNumber.trim()}
+                    onClick={async () => {
+                      setNewProductBusy(true);
+                      setNewProductError('');
+                      try {
+                        const created = await api.products.create({
+                          oem_id: Number(value.oemId),
+                          name: newProductName.trim(),
+                          part_number: newProductPartNumber.trim(),
+                          category: null,
+                          key_features: [],
+                        });
+                        setProducts((prev) => [...prev, created]);
+                        onChange({ productIds: [...value.productIds, created.id] });
+                        setAddingProduct(false);
+                        setNewProductName('');
+                        setNewProductPartNumber('');
+                      } catch (err) {
+                        setNewProductError(err instanceof Error ? err.message : 'Could not add product.');
+                      } finally {
+                        setNewProductBusy(false);
+                      }
+                    }}
+                  >
+                    Add & Select
+                  </Button>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => { setAddingProduct(false); setNewProductError(''); }}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <TextField
@@ -230,14 +307,48 @@ export default function DealFields({
         hint={value_ > 0 ? formatMoney(value_, { compact: true }) : undefined}
         required
       />
-      <TextField
-        label="Expected closing date"
-        type="date"
-        value={value.closeDate}
-        onChange={(e) => onChange({ closeDate: e.target.value })}
-        hint={value.closeDate ? formatDate(value.closeDate) : undefined}
-        required
-      />
+
+      <div className="flex flex-col gap-1.5 min-w-0">
+        <TextField
+          label="Expected closing date"
+          type="date"
+          value={value.closeDate}
+          onChange={(e) => onChange({ closeDate: e.target.value })}
+          hint={value.closeDate ? formatDate(value.closeDate) : undefined}
+          required
+        />
+        <div className="flex flex-wrap items-center gap-1.5 mt-0.5" aria-label="Quick closing date options">
+          <span className="text-[11px] text-subtle mr-0.5 font-medium">Quick date:</span>
+          {[
+            { label: '+15d', days: 15 },
+            { label: '+30d', days: 30 },
+            { label: '+60d', days: 60 },
+            { label: '+90d', days: 90 },
+            { label: 'End of month', endOfMonth: true },
+          ].map((preset) => (
+            <button
+              key={preset.label}
+              type="button"
+              onClick={() => {
+                const now = new Date();
+                let target: Date;
+                if (preset.endOfMonth) {
+                  target = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                } else {
+                  target = new Date(now.getTime() + (preset.days ?? 0) * 86400000);
+                }
+                const yyyy = target.getFullYear();
+                const mm = String(target.getMonth() + 1).padStart(2, '0');
+                const dd = String(target.getDate()).padStart(2, '0');
+                onChange({ closeDate: `${yyyy}-${mm}-${dd}` });
+              }}
+              className="px-2 py-0.5 text-xs rounded border border-line bg-surface hover:bg-tile text-fg transition-colors"
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <fieldset className="flex flex-col gap-1.5">
         <legend className="ts-lbl">Win probability</legend>
@@ -256,7 +367,21 @@ export default function DealFields({
           ))}
         </div>
       </fieldset>
-      <TextField label="Probability reason" value={value.probabilityReason} onChange={(e) => onChange({ probabilityReason: e.target.value })} placeholder="e.g. Budget confirmed" />
+
+      <TextField
+        label={`Probability reason (${value.probability}%)`}
+        value={value.probabilityReason}
+        onChange={(e) => onChange({ probabilityReason: e.target.value })}
+        placeholder={
+          value.probability === 25
+            ? 'e.g. Initial inquiry, competitor engaged'
+            : value.probability === 50
+              ? 'e.g. Budget discussed, evaluation in progress'
+              : value.probability === 75
+                ? 'e.g. Specs finalized, quotation accepted'
+                : 'e.g. PO expected, budget approved'
+        }
+      />
 
       <fieldset className="flex flex-col gap-1.5">
         <legend className="ts-lbl">Tender</legend>

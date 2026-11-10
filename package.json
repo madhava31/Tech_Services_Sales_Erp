@@ -19,6 +19,7 @@
     "db:migrate:test": "node api/db/migrate.js latest --test",
     "user:set-password": "node api/scripts/set-password.js",
     "seed:demo": "node api/scripts/seed-demo.js",
+    "demo:delete": "node api/scripts/delete-demo.js",
     "products:import": "node api/scripts/import-products.js"
   },
   "dependencies": {
