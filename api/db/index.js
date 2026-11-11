@@ -1,6 +1,6 @@
 import pg from 'pg';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { sslConfig } from './ssl.js';
+import { poolOptions } from './poolOptions.js';
 
 const { Pool } = pg;
 
@@ -16,10 +16,7 @@ if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL is not set. Copy .env.example to .env and point it at this app's own Postgres database.");
 }
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: sslConfig(process.env.DATABASE_URL),
-});
+const pool = new Pool(poolOptions());
 
 // pg-pool emits 'error' on the Pool itself when an *idle* pooled connection dies (DB restarted,
 // network drop) — independently of any in-flight request/query. Node treats an EventEmitter
@@ -74,16 +71,31 @@ function prepare(sql) {
 
 async function transaction(fn) {
   const client = await pool.connect();
+  let broken;
+  // While this request holds the connection, the pool's own 'error' listener isn't attached to it. If
+  // the connection drops mid-transaction the client emits 'error', and with no listener Node would
+  // crash the whole server. Record it instead: the query in flight fails and the client is discarded.
+  const onError = (err) => {
+    broken = err;
+  };
+  client.on('error', onError);
   try {
     await client.query('BEGIN');
     const result = await als.run(client, fn);
     await client.query('COMMIT');
     return result;
   } catch (err) {
-    await client.query('ROLLBACK');
+    // If the connection itself broke, ROLLBACK fails too: report the original error, and don't hand
+    // the broken connection to the next request.
+    if (!broken) {
+      await client.query('ROLLBACK').catch((rollbackErr) => {
+        broken = rollbackErr;
+      });
+    }
     throw err;
   } finally {
-    client.release();
+    client.off('error', onError);
+    client.release(broken);
   }
 }
 
