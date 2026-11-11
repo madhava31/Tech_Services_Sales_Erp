@@ -26,6 +26,10 @@ test('pool settings: a wait limit, and a size that can be lowered for serverless
   assert.equal(poolOptions({ DATABASE_URL: url, DATABASE_POOL_MAX: '2' }).max, 2);
   assert.equal(poolOptions({ DATABASE_URL: url, DATABASE_POOL_MAX: 'lots' }).max, 10, 'a bad value falls back to the default');
   assert.equal(poolOptions({ DATABASE_URL: url, DATABASE_POOL_MAX: '0' }).max, 10);
+  const vercel = poolOptions({ DATABASE_URL: url, VERCEL: '1' });
+  assert.equal(vercel.max, 2, 'on Vercel each copy keeps few connections, so Supabase is not overrun');
+  assert.ok(vercel.idleTimeoutMillis <= 2_000);
+  assert.equal(poolOptions({ DATABASE_URL: url, VERCEL: '1', DATABASE_POOL_MAX: '1' }).max, 1);
 });
 
 test('a connection that dies inside a transaction is not reused', async () => {
