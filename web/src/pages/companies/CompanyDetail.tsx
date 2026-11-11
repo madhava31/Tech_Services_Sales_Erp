@@ -7,6 +7,7 @@ import { useAuth } from '../../lib/auth';
 import { useLoad } from '../../lib/useLoad';
 import { OUTCOME_LABELS, STAGE_LABELS, TASK_TYPE_LABELS, URGENCY_LABELS, dueLabel, formatDate, formatDateTime, formatMoney, whatsappLink } from '../../lib/labels';
 import ContactLogCard from '../../components/ContactLogCard';
+import DealFields, { DealDraft, EMPTY_DEAL_DRAFT, dealDraftComplete, draftToInput } from '../../components/DealFields';
 import { canWriteCrm, isManagingRole } from '../../lib/roles';
 import { Badge, Button, Card, CardHeader, EmptyState, Notice, OverdueBadge, TextField, LoadingCard } from '../../components/ui';
 
@@ -102,9 +103,33 @@ function CompanyPage({ id }: { id: number }) {
   const writer = canWriteCrm(user?.role);
   const [addingContact, setAddingContact] = useState(false);
   const [contact, setContact] = useState({ name: '', designation: '', department: '', phone: '', email: '' });
+  const [creatingDeal, setCreatingDeal] = useState(false);
+  const [dealForm, setDealForm] = useState<DealDraft>(EMPTY_DEAL_DRAFT);
+  const [dealError, setDealError] = useState('');
+  const [dealBusy, setDealBusy] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const c = company.data;
+
+  async function saveDeal(e: React.FormEvent) {
+    e.preventDefault();
+    if (!c) return;
+    setDealBusy(true);
+    setDealError('');
+    try {
+      await api.opportunities.create({
+        company_id: c.id,
+        ...draftToInput(dealForm),
+      });
+      setCreatingDeal(false);
+      setDealForm(EMPTY_DEAL_DRAFT);
+      await company.reload();
+    } catch (err) {
+      setDealError(err instanceof Error ? err.message : 'Could not create the deal.');
+    } finally {
+      setDealBusy(false);
+    }
+  }
 
   async function addContact(e: React.FormEvent) {
     e.preventDefault();
@@ -320,13 +345,45 @@ function CompanyPage({ id }: { id: number }) {
           title="Opportunities"
           action={
             writer ? (
-              <Link to="/pipeline" className="text-sm font-medium text-brand">
-                Pipeline
-              </Link>
+              <div className="flex items-center gap-2">
+                {!creatingDeal && (
+                  <Button size="sm" variant="secondary" onClick={() => setCreatingDeal(true)}>
+                    + New deal
+                  </Button>
+                )}
+                <Link to="/pipeline" className="text-sm font-medium text-brand">
+                  Pipeline
+                </Link>
+              </div>
             ) : undefined
           }
         />
-        {c.opportunities.length === 0 && <EmptyState>No opportunities yet. Open one when you complete an opportunity with a real need.</EmptyState>}
+        {creatingDeal && (
+          <form onSubmit={saveDeal} className="p-4 sm:p-5 border-b border-dashed border-line flex flex-col gap-4">
+            <h4 className="text-base font-medium">New deal for {c.name}</h4>
+            {dealError && <Notice tone="error">{dealError}</Notice>}
+            <DealFields companyId={c.id} value={dealForm} onChange={(patch) => setDealForm({ ...dealForm, ...patch })} />
+            <div className="flex gap-2">
+              <Button type="submit" size="sm" disabled={dealBusy || !dealDraftComplete(dealForm)}>
+                Create deal
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setCreatingDeal(false);
+                  setDealForm(EMPTY_DEAL_DRAFT);
+                  setDealError('');
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        )}
+        {c.opportunities.length === 0 && !creatingDeal && (
+          <EmptyState>No deals yet. Open one with “+ New deal” or when you complete a visit.</EmptyState>
+        )}
         <ul className="divide-y divide-dashed divide-line overflow-hidden rounded-b-card">
           {c.opportunities.map((o) => (
             <li key={o.id}>
