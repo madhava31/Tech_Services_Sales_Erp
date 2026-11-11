@@ -21,7 +21,7 @@ const fromToday = (n) => new Date(Date.parse(`${today}T00:00:00Z`) + n * 8640000
 
 before(async () => {
   server = await startTestServer();
-  ({ runWeeklyReport, reportEmail } = await import('../api/crm/weeklyReport.js'));
+  ({ runWeeklyReport, reportEmail } = await import('../server/crm/weeklyReport.js'));
   ravi = await signedInSalesperson(server.baseUrl, 'Ravi', createClient);
   priya = await signedInSalesperson(server.baseUrl, 'Priya', createClient);
   for (const [name, role] of [['manager', 'sales_manager'], ['office', 'office_staff'], ['admin', 'admin']]) await createUser(name, role);
@@ -262,7 +262,7 @@ test('weekly report access, the email list, and a failed send is kept to show an
   assert.equal((await admin.request('PUT', `/api/reports/recipients/${id}`, { is_active: false })).body.is_active, false);
   assert.equal((await admin.request('PUT', `/api/reports/recipients/${id}`, { is_active: true })).body.is_active, true);
 
-  const { emailReport } = await import('../api/crm/weeklyReport.js');
+  const { emailReport } = await import('../server/crm/weeklyReport.js');
   const [row] = await query(`SELECT * FROM weekly_report LIMIT 1`);
   const failed = await emailReport(row, { sendEmail: async () => { throw new Error('Mail server said no'); } });
   assert.equal(failed.error, 'Mail server said no');

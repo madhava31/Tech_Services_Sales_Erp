@@ -23,7 +23,7 @@ before(async () => {
   raviId = await createSalesperson('Ravi Kumar');
   await query(`UPDATE salesperson SET employee_code = 'SE-001' WHERE id = $1`, [raviId]);
   await createUser('ravi', 'salesperson', { salespersonId: raviId });
-  await run(process.execPath, ['api/scripts/seed-demo.js'], { env: { ...process.env, DATABASE_URL: testDatabaseUrl() } });
+  await run(process.execPath, ['server/scripts/seed-demo.js'], { env: { ...process.env, DATABASE_URL: testDatabaseUrl() } });
   [{ id: priyaId }] = await query(`SELECT id FROM salesperson WHERE name = 'Priya Sharma'`);
   await createUser('manager', 'sales_manager');
   await createUser('office', 'office_staff');
@@ -39,7 +39,7 @@ after(async () => {
 });
 
 test('the demo loader refuses to run twice and leaves consistent data', async () => {
-  await assert.rejects(run(process.execPath, ['api/scripts/seed-demo.js'], { env: { ...process.env, DATABASE_URL: testDatabaseUrl() } }), /already loaded/);
+  await assert.rejects(run(process.execPath, ['server/scripts/seed-demo.js'], { env: { ...process.env, DATABASE_URL: testDatabaseUrl() } }), /already loaded/);
   const [row] = await query(
     `SELECT (SELECT COUNT(*)::int FROM company) AS companies,
             (SELECT COUNT(*)::int FROM opportunity) AS deals,

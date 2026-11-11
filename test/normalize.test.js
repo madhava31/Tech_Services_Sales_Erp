@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeCompanyName, phoneKey } from '../api/crm/normalize.js';
+import { normalizeCompanyName, phoneKey } from '../server/crm/normalize.js';
 
 test('legal suffixes, prefixes, case and punctuation are ignored', () => {
   const same = [

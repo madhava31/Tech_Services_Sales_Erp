@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import db from './db/index.js';
 
 import { requireAuth, requireAdmin } from './auth/middleware.js';
 import authRouter from './routes/auth.js';
@@ -54,6 +55,27 @@ app.use(
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 
+// Support /api/... paths rewritten on serverless platforms (Vercel)
+app.use((req, res, next) => {
+  if (req.query && req.query.slug) {
+    delete req.query.slug;
+  }
+  if (req.query && req.query.__path !== undefined) {
+    let sub = String(req.query.__path || '');
+    delete req.query.__path;
+    if (sub.startsWith('/')) sub = sub.slice(1);
+    const searchParams = new URLSearchParams(req.query).toString();
+    req.url = '/api/' + sub + (searchParams ? '?' + searchParams : '');
+  } else if (req.headers['x-forwarded-uri'] && req.headers['x-forwarded-uri'].startsWith('/api')) {
+    req.url = req.headers['x-forwarded-uri'];
+  } else if (req.headers['x-matched-path'] && req.headers['x-matched-path'].startsWith('/api')) {
+    req.url = req.headers['x-matched-path'];
+  } else if (!req.url.startsWith('/api') && !req.url.startsWith('/favicon.ico')) {
+    req.url = '/api' + (req.url.startsWith('/') ? req.url : '/' + req.url);
+  }
+  next();
+});
+
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
@@ -62,8 +84,20 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/api/health', (req, res) => {
-  res.json({ ok: true });
+app.get('/api/health', async (req, res) => {
+  let dbOk = false;
+  let dbError = null;
+  try {
+    const row = await db.prepare('SELECT 1 as connected').get();
+    dbOk = Boolean(row?.connected);
+  } catch (err) {
+    dbError = err.message;
+  }
+  res.json({
+    ok: true,
+    database: dbOk,
+    ...(dbError ? { dbError } : {}),
+  });
 });
 
 app.use('/api/auth', authRouter);

@@ -1,18 +1,17 @@
-// Local API server. Reads .env from the repository root.
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import dotenv from 'dotenv';
+import 'dotenv/config';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
-
-const app = (await import('./app.js')).default;
-const { startReminderSchedule } = await import('./crm/reminders.js');
-const { startErpSyncSchedule } = await import('./erp/sync.js');
-
-const PORT = Number(process.env.PORT) || 4100;
-app.listen(PORT, () => {
-  console.log(`Technicon Sales ERP API listening on http://localhost:${PORT}`);
-  startReminderSchedule();
-  startErpSyncSchedule();
-});
+export default async function handler(req, res) {
+  try {
+    const { default: app } = await import('../server/app.js');
+    return app(req, res);
+  } catch (err) {
+    console.error('SERVERLESS_CRASH:', err);
+    res.statusCode = 500;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({
+      error: 'Serverless Crash',
+      message: err.message,
+      stack: err.stack,
+    }, null, 2));
+  }
+}

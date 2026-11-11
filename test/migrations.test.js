@@ -10,8 +10,8 @@ import {
   assertSafeTarget,
   assertTestDatabaseUrl,
   createClient,
-} from '../api/db/migrate.js';
-import { sslConfig } from '../api/db/ssl.js';
+} from '../server/db/migrate.js';
+import { sslConfig } from '../server/db/ssl.js';
 import { resetTestDatabase, testDatabaseUrl, query } from './helpers/testDb.js';
 
 async function withClient(fn) {
@@ -117,5 +117,7 @@ test('test database URL must be local and end in _test', () => {
 
 test('remote connections always verify TLS certificates', () => {
   assert.equal(sslConfig('postgres://u:p@localhost:5432/dev'), false);
-  assert.deepEqual(sslConfig('postgres://u:p@db.example.supabase.co:6543/postgres'), { rejectUnauthorized: true });
+  const remote = sslConfig('postgres://u:p@db.example.supabase.co:6543/postgres');
+  assert.equal(remote.rejectUnauthorized, true, 'the certificate is always checked');
+  assert.match(remote.ca, /BEGIN CERTIFICATE/, 'checked against the Supabase root certificate built into the app');
 });

@@ -1,11 +1,11 @@
 import { sslConfig } from './ssl.js';
 
 // Connection pool settings. Kept apart from index.js so they can be checked without opening a pool.
-export function poolOptions(env = process.env) {
+export function poolOptions(env = process.env, connectionString = env.DATABASE_URL) {
   const max = Number(env.DATABASE_POOL_MAX);
   return {
-    connectionString: env.DATABASE_URL,
-    ssl: sslConfig(env.DATABASE_URL),
+    connectionString,
+    ssl: sslConfig(connectionString),
     // Connections this server process keeps open. Supabase's pooler caps the total across every
     // running copy of the app, so on serverless hosting (several copies at once) set this to 1-3.
     max: Number.isInteger(max) && max > 0 ? max : 10,

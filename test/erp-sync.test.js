@@ -65,7 +65,7 @@ before(async () => {
   process.env.ERP_API_KEY = KEY;
 
   server = await startTestServer();
-  ({ runErpSync } = await import('../api/erp/sync.js'));
+  ({ runErpSync } = await import('../server/erp/sync.js'));
   ravi = await signedInSalesperson(server.baseUrl, 'Ravi', createClient);
   priya = await signedInSalesperson(server.baseUrl, 'Priya', createClient);
   for (const [name, role] of [['manager', 'sales_manager'], ['office', 'office_staff'], ['admin', 'admin']]) await createUser(name, role);

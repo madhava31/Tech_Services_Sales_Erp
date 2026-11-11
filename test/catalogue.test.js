@@ -112,7 +112,7 @@ test('OEMs and market segments: only MD/Admin manage them; in use can be deactiv
 });
 
 test('the products CSV: quoted fields, " | " features, update by part number, unknown makes refused', async () => {
-  const { parseProductCsv } = await import('../api/crm/products.js');
+  const { parseProductCsv } = await import('../server/crm/products.js');
   const rows = parseProductCsv(`part_number,product_name,make,category,key_features\r\nTS-A,"Balance, analytical",Mettler Toledo,Weighing,"0.1 mg | Auto ""cal"""\r\n\r\n`);
   assert.deepEqual(rows, [{ part_number: 'TS-A', name: 'Balance, analytical', make: 'Mettler Toledo', category: 'Weighing', key_features: ['0.1 mg', 'Auto "cal"'] }]);
   assert.throws(() => parseProductCsv('part_number,name\nx,y'), /product_name/);
@@ -122,15 +122,15 @@ test('the products CSV: quoted fields, " | " features, update by part number, un
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'products-'));
   const good = path.join(dir, 'good.csv');
   fs.writeFileSync(good, 'part_number,product_name,make,category,key_features\nTS-IMP,First name,Anton Paar,Density,A | B\n');
-  assert.match((await run(process.execPath, ['api/scripts/import-products.js', good], { env })).stdout, /1 added, 0 updated/);
+  assert.match((await run(process.execPath, ['server/scripts/import-products.js', good], { env })).stdout, /1 added, 0 updated/);
   fs.writeFileSync(good, 'part_number,product_name,make,category,key_features\nTS-IMP,Second name,Anton Paar,Density,A | B | C\n');
-  assert.match((await run(process.execPath, ['api/scripts/import-products.js', good], { env })).stdout, /0 added, 1 updated/);
+  assert.match((await run(process.execPath, ['server/scripts/import-products.js', good], { env })).stdout, /0 added, 1 updated/);
   const [row] = await query(`SELECT name, key_features FROM product WHERE part_number = 'TS-IMP'`);
   assert.equal(row.name, 'Second name');
   assert.deepEqual(row.key_features, ['A', 'B', 'C']);
   const bad = path.join(dir, 'bad.csv');
   fs.writeFileSync(bad, 'part_number,product_name,make,category,key_features\nTS-X,Thing,Unknown Make,,\n');
-  await assert.rejects(run(process.execPath, ['api/scripts/import-products.js', bad], { env }), /Unknown Make/);
+  await assert.rejects(run(process.execPath, ['server/scripts/import-products.js', bad], { env }), /Unknown Make/);
   fs.rmSync(dir, { recursive: true, force: true });
 });
 

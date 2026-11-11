@@ -8,18 +8,19 @@
     "node": ">=22"
   },
   "scripts": {
-    "start": "node api/index.js",
-    "dev:api": "node --watch api/index.js",
+    "start": "node server/index.js",
+    "dev:api": "node --watch server/index.js",
     "dev:web": "npm --prefix web run dev",
-    "build": "npm --prefix web run build",
+    "build": "npm --prefix web run build && node -e \"import('node:fs').then(fs => fs.cpSync('web/dist', 'dist', { recursive: true }))\"",
     "test": "node --test --test-concurrency=1 \"test/**/*.test.js\"",
     "typecheck": "npm --prefix web run typecheck",
-    "db:migrate": "node api/db/migrate.js latest",
-    "db:migrate:status": "node api/db/migrate.js status",
-    "db:migrate:test": "node api/db/migrate.js latest --test",
-    "user:set-password": "node api/scripts/set-password.js",
-    "seed:demo": "node api/scripts/seed-demo.js",
-    "products:import": "node api/scripts/import-products.js"
+    "db:migrate": "node server/db/migrate.js latest",
+    "db:migrate:status": "node server/db/migrate.js status",
+    "db:migrate:test": "node server/db/migrate.js latest --test",
+    "user:set-password": "node server/scripts/set-password.js",
+    "seed:demo": "node server/scripts/seed-demo.js",
+    "demo:delete": "node server/scripts/delete-demo.js",
+    "products:import": "node server/scripts/import-products.js"
   },
   "dependencies": {
     "cookie-parser": "^1.4.7",

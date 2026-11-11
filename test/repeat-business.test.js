@@ -20,8 +20,8 @@ const fromToday = (n) => new Date(Date.parse(`${today}T00:00:00Z`) + n * 8640000
 
 before(async () => {
   server = await startTestServer();
-  ({ runDailyReminders } = await import('../api/crm/reminders.js'));
-  ({ createRepeatFollowups } = await import('../api/crm/repeat.js'));
+  ({ runDailyReminders } = await import('../server/crm/reminders.js'));
+  ({ createRepeatFollowups } = await import('../server/crm/repeat.js'));
   ravi = await signedInSalesperson(server.baseUrl, 'Ravi', createClient);
   priya = await signedInSalesperson(server.baseUrl, 'Priya', createClient);
   await createUser('manager', 'sales_manager');

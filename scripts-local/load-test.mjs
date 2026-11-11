@@ -5,7 +5,7 @@ import { createUser, createSalesperson, createCompany, dealFieldsFor, login } fr
 
 const SALESPEOPLE = 12;
 const server = await startTestServer();
-const db = (await import('../api/db/index.js')).default;
+const db = (await import('../server/db/index.js')).default;
 
 // Watch the connection pool: how many connections open, and how many requests queued waiting for one.
 const poolPeak = { total: 0, waiting: 0 };

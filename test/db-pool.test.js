@@ -3,14 +3,14 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startTestServer } from './helpers/server.js';
-import { poolOptions } from '../api/db/poolOptions.js';
+import { poolOptions } from '../server/db/poolOptions.js';
 
 let server;
 let db;
 
 before(async () => {
   server = await startTestServer();
-  db = (await import('../api/db/index.js')).default;
+  db = (await import('../server/db/index.js')).default;
 });
 
 after(async () => {

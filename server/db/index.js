@@ -12,21 +12,23 @@ pg.types.setTypeParser(1082, (val) => val);
 // NUMERIC (quantities, money) arrives as a string; the amounts here fit a JS number exactly.
 pg.types.setTypeParser(1700, (val) => Number(val));
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL is not set. Copy .env.example to .env and point it at this app's own Postgres database.");
+let _pool = null;
+
+export function getPool() {
+  if (!_pool) {
+    const connStr = process.env.DATABASE_URL || process.env.DATABASE_URL1 || process.env.POSTGRES_URL;
+    if (!connStr) {
+      throw new Error("DATABASE_URL is not set. Copy .env.example to .env and point it at this app's own Postgres database.");
+    }
+    _pool = new Pool(poolOptions(process.env, connStr));
+    // pg-pool emits 'error' when an *idle* pooled connection dies (database restarted, network drop).
+    // With no listener Node would crash the whole server; this lets the pool discard it and reconnect.
+    _pool.on('error', (err) => {
+      console.error('Postgres pool error (idle client):', err.message);
+    });
+  }
+  return _pool;
 }
-
-const pool = new Pool(poolOptions());
-
-// pg-pool emits 'error' on the Pool itself when an *idle* pooled connection dies (DB restarted,
-// network drop) — independently of any in-flight request/query. Node treats an EventEmitter
-// 'error' with no listener as an unhandled exception, which crashes the entire process (reproduced
-// locally: stopping the DB while the pool had an idle connection open killed the whole server,
-// including in-flight requests unrelated to auth). Listening here lets pg-pool silently discard
-// the broken client and open a fresh one on next use — no behavior change for any request.
-pool.on('error', (err) => {
-  console.error('Postgres pool error (idle client):', err.message);
-});
 
 // Holds the active transaction client, if any, so nested helpers (e.g. numbering.js) that call
 // db.prepare(...) directly automatically participate in the surrounding transaction without
@@ -34,7 +36,7 @@ pool.on('error', (err) => {
 const als = new AsyncLocalStorage();
 
 function executor() {
-  return als.getStore() || pool;
+  return als.getStore() || getPool();
 }
 
 // Queries are written with `?` placeholders (shorter, and matching the Technicon Services ERP's
@@ -70,7 +72,7 @@ function prepare(sql) {
 }
 
 async function transaction(fn) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   let broken;
   // While this request holds the connection, the pool's own 'error' listener isn't attached to it. If
   // the connection drops mid-transaction the client emits 'error', and with no listener Node would
@@ -99,5 +101,12 @@ async function transaction(fn) {
   }
 }
 
-const db = { prepare, transaction, pool };
+const db = {
+  prepare,
+  transaction,
+  get pool() {
+    return getPool();
+  },
+};
+
 export default db;

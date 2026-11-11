@@ -20,7 +20,7 @@ const IST_TODAY = `(NOW() AT TIME ZONE 'Asia/Kolkata')::date`;
 
 before(async () => {
   server = await startTestServer();
-  ({ runDailyReminders, isAllowedPushEndpoint } = await import('../api/crm/reminders.js'));
+  ({ runDailyReminders, isAllowedPushEndpoint } = await import('../server/crm/reminders.js'));
   ravi = await signedInSalesperson(server.baseUrl, 'Ravi', createClient);
   priya = await signedInSalesperson(server.baseUrl, 'Priya', createClient);
   await createUser('manager', 'sales_manager');
