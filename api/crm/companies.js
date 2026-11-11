@@ -31,7 +31,7 @@ export async function assertValidParent(parentId, { companyId = null } = {}) {
   return parent;
 }
 
-const FILLABLE = ['city', 'state', 'address', 'phone', 'email', 'contact_person', 'gstin', 'category'];
+const FILLABLE = ['city', 'state', 'address', 'pincode', 'phone', 'email', 'contact_person', 'gstin', 'category'];
 
 // Moves everything from a duplicate onto the company being kept, inside one transaction, then
 // archives the duplicate. Nothing is deleted, and the audit entry lists every record moved.
@@ -77,8 +77,8 @@ export async function mergeCompanies({ sourceId, targetId, reason, userId }) {
     for (const key of FILLABLE) if (!target[key] && source[key]) filled[key] = source[key];
     const merged = { ...target, ...filled };
     await db
-      .prepare(`UPDATE company SET city = ?, state = ?, address = ?, phone = ?, email = ?, contact_person = ?, gstin = ?, category = ?, erp_company_id = ?, updated_at = NOW() WHERE id = ?`)
-      .run(merged.city, merged.state, merged.address, merged.phone, merged.email, merged.contact_person, merged.gstin, merged.category, erpCompanyId, targetId);
+      .prepare(`UPDATE company SET city = ?, state = ?, address = ?, pincode = ?, phone = ?, email = ?, contact_person = ?, gstin = ?, category = ?, erp_company_id = ?, updated_at = NOW() WHERE id = ?`)
+      .run(merged.city, merged.state, merged.address, merged.pincode, merged.phone, merged.email, merged.contact_person, merged.gstin, merged.category, erpCompanyId, targetId);
 
     await recordAudit({
       actorUserId: userId,

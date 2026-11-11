@@ -92,7 +92,7 @@ export default function TenderCard({ deal, canEdit, onChanged }: { deal: Opportu
           <div className="ts-span2 min-w-0">
             <TextAreaField label="Notes" rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           </div>
-          {form.bid_status === 'won' && !deal.closed_at && <p className="ts-span2 text-xs text-ink-muted">Bid won? Mark the deal won once the order value is confirmed.</p>}
+          {form.bid_status === 'won' && !deal.closed_at && <p className="ts-span2 text-xs text-ink-muted">Bid won? Mark the opportunity won once the order value is confirmed.</p>}
           <div className="ts-span2 flex gap-2">
             <Button type="submit" size="sm" disabled={busy || !form.tender_number.trim() || !form.bid_due_date || (needsAmount && !form.emd_amount)}>
               Save tender

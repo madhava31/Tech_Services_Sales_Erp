@@ -35,12 +35,12 @@ export default function Visits() {
   return (
     <div>
       <PageHeader
-        title="Visits"
-        description={teamView ? 'Every salesperson’s visits, newest first.' : 'Your visits, newest first.'}
+        title="Opportunities"
+        description={teamView ? 'Every salesperson’s opportunities, newest first.' : 'Your opportunities, newest first.'}
         actions={
           canWriteCrm(user?.role) && (
             <Link to="/visits/new" className="ts-btn ts-dark justify-center max-[860px]:min-h-11">
-              + Log visit
+              + New opportunity
             </Link>
           )
         }
@@ -65,7 +65,7 @@ export default function Visits() {
           {visits && <span className="ts-showing ts-muted">Showing {visits.length}</span>}
         </div>
         {visits === null && !error && <SkeletonRows />}
-        {visits?.length === 0 && <EmptyState>No visits yet.</EmptyState>}
+        {visits?.length === 0 && <EmptyState>No opportunities yet.</EmptyState>}
         {visits && visits.length > 0 && (
           <>
             <div className={`ts-tblwrap ${DESKTOP_ONLY}`}>

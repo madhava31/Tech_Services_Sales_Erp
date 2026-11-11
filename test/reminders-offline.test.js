@@ -67,7 +67,7 @@ test('the daily digest: each person’s own work, once a day, pushed to their ph
   const first = await runDailyReminders({ send: async (subscription, payload) => sent.push({ endpoint: subscription.endpoint, payload }) });
   assert.equal(first.pushed, 1);
   assert.equal(sent[0].endpoint, GOOD_ENDPOINT);
-  assert.equal(sent[0].payload.body, '1 follow-up due today, 1 follow-up overdue, 1 deal past closing date');
+  assert.equal(sent[0].payload.body, '1 follow-up due today, 1 follow-up overdue, 1 opportunity past closing date');
 
   const again = await runDailyReminders({ send: async (s, payload) => sent.push(payload) });
   assert.equal(again.created, 0, 'a restart or second run sends nothing new');
@@ -75,13 +75,13 @@ test('the daily digest: each person’s own work, once a day, pushed to their ph
 
   const mine = (await ravi.client.request('GET', '/api/notifications')).body;
   assert.equal(mine.unread, 1);
-  assert.match(mine.items[0].body, /1 deal past closing date/);
+  assert.match(mine.items[0].body, /1 opportunity past closing date/);
   assert.equal((await priya.client.request('GET', '/api/notifications')).body.items.length, 0, 'nothing due, so no digest');
   assert.equal((await office.request('GET', '/api/notifications')).body.items.length, 0, 'office staff own no follow-ups');
 
   const team = (await manager.request('GET', '/api/notifications')).body;
   assert.equal(team.items[0].title, 'Team today');
-  assert.equal(team.items[0].body, '1 follow-up overdue, 1 deal past closing date');
+  assert.equal(team.items[0].body, '1 follow-up overdue, 1 opportunity past closing date');
   assert.equal(team.items[0].url, '/team');
 
   assert.equal((await ravi.client.request('POST', '/api/notifications/read-all')).status, 200);

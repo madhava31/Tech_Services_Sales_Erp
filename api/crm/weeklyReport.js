@@ -144,14 +144,14 @@ export function reportEmail(report) {
   <p style="margin:0 0 14px;color:#5B6480;font-size:14px">${esc(dayMonth(report.week_start))} to ${esc(dayMonth(report.week_end))}</p>
   <table style="border-collapse:collapse;width:100%">
     <tr><td style="${cell}">Orders won</td><td style="${num}"><b>${esc(money(t.won_value))}</b> (${t.deals_won})</td></tr>
-    <tr><td style="${cell}">Visits</td><td style="${num}">${t.visits}</td></tr>
-    <tr><td style="${cell}">Deals lost / abandoned</td><td style="${num}">${t.deals_lost} / ${t.deals_abandoned}</td></tr>
-    <tr><td style="${cell}">Open pipeline</td><td style="${num}">${esc(money(t.pipeline_value))} (${t.open_deals} deals), weighted ${esc(money(t.weighted_pipeline))}</td></tr>
+    <tr><td style="${cell}">Opportunities</td><td style="${num}">${t.visits}</td></tr>
+    <tr><td style="${cell}">Opportunities lost / abandoned</td><td style="${num}">${t.deals_lost} / ${t.deals_abandoned}</td></tr>
+    <tr><td style="${cell}">Open pipeline</td><td style="${num}">${esc(money(t.pipeline_value))} (${t.open_deals} opportunities), weighted ${esc(money(t.weighted_pipeline))}</td></tr>
     <tr><td style="${cell}">Past closing date / stuck</td><td style="${num}">${t.overdue_deals} / ${t.stuck_deals}</td></tr>
   </table>
   <h3 style="margin:20px 0 6px;font-size:15px">By salesperson</h3>
   <table style="border-collapse:collapse;width:100%">
-    <tr><th style="${cell}">Name</th><th style="${num}">Visits</th><th style="${num}">Won</th><th style="${num}">Pipeline</th><th style="${num}">Overdue</th><th style="${num}">Stuck</th></tr>
+    <tr><th style="${cell}">Name</th><th style="${num}">Opportunities</th><th style="${num}">Won</th><th style="${num}">Pipeline</th><th style="${num}">Overdue</th><th style="${num}">Stuck</th></tr>
     ${d.salespeople.map((p) => `<tr><td style="${cell}">${esc(p.name)}</td><td style="${num}">${p.visits}</td><td style="${num}">${esc(money(p.won_value))}</td><td style="${num}">${esc(money(p.pipeline_value))}</td><td style="${num}">${p.overdue_deals}</td><td style="${num}">${p.stuck_deals}</td></tr>`).join('')}
   </table>
   ${list('Biggest wins', d.wins, (r) => `${esc(r.title)}, ${esc(r.company_name)}: <b>${esc(money(r.value))}</b> (${esc(r.owner_name)})`)}
@@ -160,7 +160,7 @@ export function reportEmail(report) {
   ${list('Tenders due', d.tenders, (r) => `${esc(r.tender_number)}, ${esc(r.company_name)}: due ${esc(dayMonth(r.date))} (${esc(r.owner_name)})`)}
   ${link}
 </div>`;
-  const text = `Weekly sales report, ${dayMonth(report.week_start)} to ${dayMonth(report.week_end)}\nOrders won: ${money(t.won_value)} (${t.deals_won})\nVisits: ${t.visits}\nOpen pipeline: ${money(t.pipeline_value)} (${t.open_deals} deals)\nPast closing date: ${t.overdue_deals}. Stuck: ${t.stuck_deals}.`;
+  const text = `Weekly sales report, ${dayMonth(report.week_start)} to ${dayMonth(report.week_end)}\nOrders won: ${money(t.won_value)} (${t.deals_won})\nVisits: ${t.visits}\nOpen pipeline: ${money(t.pipeline_value)} (${t.open_deals} opportunities)\nPast closing date: ${t.overdue_deals}. Stuck: ${t.stuck_deals}.`;
   return { subject, html, text };
 }
 

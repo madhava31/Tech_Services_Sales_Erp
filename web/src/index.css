@@ -275,3 +275,51 @@ select:focus {
     min-height: 44px;
   }
 }
+
+/* The main menu on phones: a 44px touch target, and on narrow screens all five fit without scrolling. */
+@media (max-width: 860px) {
+  .ts-top .ts-nav > a,
+  .ts-top .ts-nav > button {
+    min-height: 44px;
+  }
+}
+@media (max-width: 480px) {
+  .ts-top .ts-nav > a,
+  .ts-top .ts-nav > button {
+    padding-inline: 9px;
+  }
+  .ts-top .ts-nav .ts-chev {
+    display: none;
+  }
+}
+
+/* Phones: every tap target is at least 44px. Back links and card footer links grow; small inline links
+   (phone numbers, WhatsApp, names in a list) keep their look and get a bigger invisible hit area. */
+@media (max-width: 860px) {
+  main a.ts-back,
+  main a.ts-kfoot {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+  main a.ts-back {
+    display: inline-flex;
+    margin-bottom: 0;
+  }
+  main a[href^="tel:"],
+  main a[href^="mailto:"],
+  main a[href*="wa.me"],
+  main a[download],
+  main a.block.text-sm {
+    position: relative;
+  }
+  main a[href^="tel:"]::after,
+  main a[href^="mailto:"]::after,
+  main a[href*="wa.me"]::after,
+  main a[download]::after,
+  main a.block.text-sm::after {
+    content: '';
+    position: absolute;
+    inset: -12px -6px;
+  }
+}

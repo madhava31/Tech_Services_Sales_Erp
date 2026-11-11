@@ -214,19 +214,19 @@ export default function WeeklyReports() {
           <section>
             <h2 className="ts-lbl">Last week</h2>
             <div className="ts-grid ts-kpis print:!grid-cols-4">
-              <Tile label="Orders won" value={formatMoney(t.won_value, { compact: true })} hint={`${t.deals_won} deals. ${change(t.won_value, p.won_value, (n) => formatMoney(n, { compact: true }))}`} tone="ok" />
-              <Tile label="Visits" value={t.visits} hint={change(t.visits, p.visits, String)} />
-              <Tile label="New deals" value={t.deals_opened} hint={change(t.deals_opened, p.deals_opened, String)} />
+              <Tile label="Orders won" value={formatMoney(t.won_value, { compact: true })} hint={`${t.deals_won} opportunities. ${change(t.won_value, p.won_value, (n) => formatMoney(n, { compact: true }))}`} tone="ok" />
+              <Tile label="Opportunities" value={t.visits} hint={change(t.visits, p.visits, String)} />
+              <Tile label="New opportunities" value={t.deals_opened} hint={change(t.deals_opened, p.deals_opened, String)} />
               <Tile label="Lost or abandoned" value={t.deals_lost + t.deals_abandoned} hint={`${t.deals_lost} lost, ${t.deals_abandoned} abandoned`} />
             </div>
           </section>
           <section>
             <h2 className="ts-lbl">Where things stood that morning</h2>
             <div className="ts-grid ts-kpis print:!grid-cols-4">
-              <Tile label="Open pipeline" value={formatMoney(t.pipeline_value, { compact: true })} hint={`${t.open_deals} deals, weighted ${formatMoney(t.weighted_pipeline, { compact: true })}`} />
+              <Tile label="Open pipeline" value={formatMoney(t.pipeline_value, { compact: true })} hint={`${t.open_deals} opportunities, weighted ${formatMoney(t.weighted_pipeline, { compact: true })}`} />
               <Tile label="Expected this month" value={formatMoney(d.forecast_this_month.commit, { compact: true })} hint={`Commit. Best case ${formatMoney(d.forecast_this_month.best_case, { compact: true })}`} />
               <Tile label="Past closing date" value={t.overdue_deals} tone={t.overdue_deals ? 'danger' : undefined} />
-              <Tile label="Stuck deals" value={t.stuck_deals} tone={t.stuck_deals ? 'warn' : undefined} />
+              <Tile label="Stuck opportunities" value={t.stuck_deals} tone={t.stuck_deals ? 'warn' : undefined} />
               <Tile label="Overdue follow-ups" value={t.overdue_follow_ups} tone={t.overdue_follow_ups ? 'danger' : undefined} />
               <Tile label="Renewals in 30 days" value={d.renewals_30_days} />
               <Tile label="EMD to recover" value={formatMoney(d.emd_to_recover, { compact: true })} />
@@ -247,7 +247,7 @@ export default function WeeklyReports() {
                     </span>
                   </div>
                   <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-ink-muted">
-                    <span>{s.visits} visits</span>
+                    <span>{s.visits} {s.visits === 1 ? 'opportunity' : 'opportunities'}</span>
                     <span>{formatMoney(s.pipeline_value, { compact: true })} open ({s.open_deals})</span>
                     <span className={s.overdue_deals ? 'text-danger font-medium' : ''}>{s.overdue_deals} overdue</span>
                     <span className={s.stuck_deals ? 'text-warn font-medium' : ''}>{s.stuck_deals} stuck</span>
@@ -260,7 +260,7 @@ export default function WeeklyReports() {
 
           <DealList title="Biggest wins" rows={d.wins} line={(i) => formatMoney(d.wins[i].value, { compact: true })} />
           <DealList title="Closing this week" rows={d.closing} line={(i) => `${formatMoney(d.closing[i].value, { compact: true })} · ${d.closing[i].probability}%`} />
-          <DealList title="Biggest deals needing attention" rows={d.at_risk} line={(i) => formatMoney(d.at_risk[i].value, { compact: true })} />
+          <DealList title="Biggest opportunities needing attention" rows={d.at_risk} line={(i) => formatMoney(d.at_risk[i].value, { compact: true })} />
           {d.tenders.length > 0 && (
             <Card className="break-inside-avoid">
               <CardHeader title="Tenders due this week" />

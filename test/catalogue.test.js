@@ -41,8 +41,8 @@ const oemId = async (name) => (await query(`SELECT id FROM oem WHERE name = $1`,
 test('the six OEMs and four market segments are seeded', async () => {
   const oems = (await ravi.client.request('GET', '/api/oems')).body.map((o) => o.name).sort();
   assert.deepEqual(oems, ['Anton Paar', 'Merck', 'Mettler Toledo', 'PerkinElmer', 'SHINE', 'Vintage Chrom']);
-  const segments = (await ravi.client.request('GET', '/api/market-segments')).body.map((s) => s.name).sort();
-  assert.deepEqual(segments, ['Applied (non-pharma)', 'Food (R&A, not R&D)', 'Pharma', 'R&A']);
+  const segments = (await ravi.client.request('GET', '/api/market-segments')).body.map((s) => s.name);
+  assert.deepEqual(segments, ['Pharma', 'Non-pharma', 'Food', 'Research & Analytics'], 'the fixed list, in its set order');
 });
 
 test('products: admin and office manage them; managers and salespeople only view', async () => {

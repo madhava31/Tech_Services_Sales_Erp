@@ -104,7 +104,7 @@ export default function DealDetail() {
       {notice && <Notice tone="success" onDismiss={() => setNotice('')}>{notice}</Notice>}
       {open && d.erp_orders.length > 0 && (
         <div className="ts-okbox block">
-          <b className="font-medium">Order in the ERP:</b> {d.erp_orders.map((o) => `${o.number}${o.client_po_ref ? ` (customer PO ${o.client_po_ref})` : ''}`).join(', ')}. Mark the deal won once you’ve confirmed the value.
+          <b className="font-medium">Order in the ERP:</b> {d.erp_orders.map((o) => `${o.number}${o.client_po_ref ? ` (customer PO ${o.client_po_ref})` : ''}`).join(', ')}. Mark the opportunity won once you’ve confirmed the value.
         </div>
       )}
 
@@ -162,7 +162,7 @@ export default function DealDetail() {
           ) : (
             isManagingRole(user?.role) && (
               <Button size="sm" variant="secondary" onClick={() => setPanel('reopen')}>
-                Reopen deal
+                Reopen opportunity
               </Button>
             )
           )}
@@ -186,25 +186,25 @@ export default function DealDetail() {
               suggested={d.quotations.find((q) => q.status === 'accepted')?.amount ?? d.estimated_value}
               busy={busy}
               onCancel={() => setPanel(null)}
-              onSubmit={(won_value, close_reason) => run(() => api.opportunities.moveStage(d.id, { stage: 'won', won_value, close_reason }), 'Deal won.')}
+              onSubmit={(won_value, close_reason) => run(() => api.opportunities.moveStage(d.id, { stage: 'won', won_value, close_reason }), 'Opportunity won.')}
             />
           )}
           {panel === 'lost' && (
             <LostForm
               busy={busy}
               onCancel={() => setPanel(null)}
-              onSubmit={(lost_reason, close_reason) => run(() => api.opportunities.moveStage(d.id, { stage: 'lost', lost_reason, close_reason }), 'Deal marked lost.')}
+              onSubmit={(lost_reason, close_reason) => run(() => api.opportunities.moveStage(d.id, { stage: 'lost', lost_reason, close_reason }), 'Opportunity marked lost.')}
             />
           )}
           {panel === 'abandoned' && (
             <AbandonForm
               busy={busy}
               onCancel={() => setPanel(null)}
-              onSubmit={(close_reason) => run(() => api.opportunities.moveStage(d.id, { stage: 'abandoned', close_reason }), 'Deal marked abandoned.')}
+              onSubmit={(close_reason) => run(() => api.opportunities.moveStage(d.id, { stage: 'abandoned', close_reason }), 'Opportunity marked abandoned.')}
             />
           )}
           {panel === 'edit' && (
-            <EditForm deal={d} busy={busy} onCancel={() => setPanel(null)} onSubmit={(data) => run(() => api.opportunities.update(d.id, data), 'Deal updated.')} />
+            <EditForm deal={d} busy={busy} onCancel={() => setPanel(null)} onSubmit={(data) => run(() => api.opportunities.update(d.id, data), 'Opportunity updated.')} />
           )}
           {panel === 'transfer' && (
             <TransferForm
@@ -220,7 +220,7 @@ export default function DealDetail() {
       )}
 
       <Card>
-        <CardHeader title="Deal details" />
+        <CardHeader title="Opportunity details" />
         <div className="ts-dw-meta !bg-transparent !rounded-none px-4 sm:px-5 text-sm">
           {(
             [
@@ -292,7 +292,7 @@ export default function DealDetail() {
 
       {d.visits.length > 0 && (
         <Card>
-          <CardHeader title="Visits" />
+          <CardHeader title="Opportunities" />
           <ul className="divide-y divide-dashed divide-line overflow-hidden rounded-b-card">
             {d.visits.map((v) => (
               <li key={v.id}>
@@ -370,7 +370,7 @@ function TransferForm({
       <TextField label="Reason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Customer is in their territory" required />
       <div className="ts-span2 flex gap-2">
         <Button type="submit" size="sm" disabled={busy || !toId || !reason.trim()}>
-          Transfer deal
+          Transfer opportunity
         </Button>
         <Button size="sm" variant="ghost" onClick={onCancel}>
           Cancel
@@ -505,7 +505,7 @@ function AbandonForm({ busy, onCancel, onSubmit }: { busy: boolean; onCancel: ()
       <TextAreaField label="Why is it being abandoned?" rows={2} placeholder="e.g. Customer project on hold, no reply for two months" value={reason} onChange={(e) => setReason(e.target.value)} required />
       <div className="flex gap-2">
         <Button type="submit" size="sm" variant="danger" disabled={busy || !reason.trim()}>
-          Abandon deal
+          Abandon opportunity
         </Button>
         <Button size="sm" variant="ghost" onClick={onCancel}>
           Cancel
@@ -590,7 +590,7 @@ function Quotations({ deal, canRecord, onChanged, onError }: { deal: Opportunity
                   </span>
                 </span>
                 <Button size="sm" variant="secondary" disabled={busy} onClick={() => act(() => api.opportunities.addQuotation(deal.id, { quotation_number: q.number, erp_quotation_id: q.id }))}>
-                  Add to this deal
+                  Add to this opportunity
                 </Button>
               </li>
             ))}

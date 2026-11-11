@@ -8,6 +8,7 @@ export function contactFields(body) {
   return {
     name: requiredText(body, 'name', { max: 120 }),
     designation: optionalText(body, 'designation', { max: 120 }),
+    department: optionalText(body, 'department', { max: 120 }),
     phone: optionalText(body, 'phone', { max: 30 }),
     email: optionalEmail(body, 'email'),
   };
@@ -35,8 +36,8 @@ export function phoneTakenMessage(owner, phone) {
 // Inserts inside the caller's transaction.
 export async function insertContact({ companyId, fields, userId }) {
   const info = await db
-    .prepare(`INSERT INTO company_contact (company_id, name, designation, phone, email, created_by) VALUES (?, ?, ?, ?, ?, ?) RETURNING id`)
-    .run(companyId, fields.name, fields.designation, fields.phone, fields.email, userId);
+    .prepare(`INSERT INTO company_contact (company_id, name, designation, department, phone, email, created_by) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`)
+    .run(companyId, fields.name, fields.designation, fields.department ?? null, fields.phone, fields.email, userId);
   await recordAudit({
     actorUserId: userId,
     action: 'contact.created',
@@ -57,4 +58,16 @@ export async function resolveContactByPhone({ companyId, fields, userId }) {
     return owner.id;
   }
   return insertContact({ companyId, fields, userId });
+}
+
+// The contact person typed on a company becomes a contact, so deals and visits can choose them. Skipped when
+// the company already has a contact of that name (for example the person being met, entered alongside).
+export async function addContactPerson({ companyId, name, userId }) {
+  const person = (name ?? '').trim();
+  if (!person) return null;
+  const existing = await db
+    .prepare(`SELECT id FROM company_contact WHERE company_id = ? AND archived_at IS NULL AND lower(btrim(name)) = lower(?)`)
+    .get(companyId, person);
+  if (existing) return existing.id;
+  return insertContact({ companyId, fields: { name: person, designation: null, department: null, phone: null, email: null }, userId });
 }

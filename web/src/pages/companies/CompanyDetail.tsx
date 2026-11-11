@@ -101,7 +101,7 @@ function CompanyPage({ id }: { id: number }) {
   const [panel, setPanel] = useState<'merge' | 'parent' | null>(null);
   const writer = canWriteCrm(user?.role);
   const [addingContact, setAddingContact] = useState(false);
-  const [contact, setContact] = useState({ name: '', designation: '', phone: '', email: '' });
+  const [contact, setContact] = useState({ name: '', designation: '', department: '', phone: '', email: '' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const c = company.data;
@@ -112,7 +112,7 @@ function CompanyPage({ id }: { id: number }) {
     setError('');
     try {
       await api.companies.addContact(id, contact);
-      setContact({ name: '', designation: '', phone: '', email: '' });
+      setContact({ name: '', designation: '', department: '', phone: '', email: '' });
       setAddingContact(false);
       await company.reload();
     } catch (err) {
@@ -144,7 +144,7 @@ function CompanyPage({ id }: { id: number }) {
               </Link>
             </p>
           )}
-          {c.address && <p className="text-sm text-ink-muted">{c.address}</p>}
+          {(c.address || c.pincode) && <p className="text-sm text-ink-muted">{[c.address, c.pincode && `PIN ${c.pincode}`].filter(Boolean).join(' · ')}</p>}
           <div className="flex flex-wrap gap-x-4 mt-1">
             {c.phone && (
               <a href={`tel:${c.phone}`} className="text-sm font-medium text-brand">
@@ -160,8 +160,8 @@ function CompanyPage({ id }: { id: number }) {
         </div>
         <span className="ts-grow" />
         {writer && c.approval_status !== 'rejected' && (
-          <Link to={`/visits/new?company=${c.id}`} className="shrink-0 ts-btn ts-dark justify-center max-[860px]:min-h-11">
-            + Log a visit here
+          <Link to={`/opportunities/new?company=${c.id}`} className="shrink-0 ts-btn ts-dark justify-center max-[860px]:min-h-11">
+            + New opportunity
           </Link>
         )}
       </header>
@@ -169,7 +169,7 @@ function CompanyPage({ id }: { id: number }) {
       {error && <Notice tone="error" onDismiss={() => setError('')}>{error}</Notice>}
       {c.approval_status === 'pending' && (
         <div className="ts-box !bg-warnbg text-warn text-[13.5px]">
-          <b>Pending approval.</b> Visits can be logged now; a deal can be opened once a manager approves this company.{' '}
+          <b>Pending approval.</b> Opportunities can be logged now; an opportunity can be opened once a manager approves this company.{' '}
           {isManagingRole(user?.role) && (
             <Link to="/approvals" className="font-medium underline">
               Review it
@@ -252,7 +252,7 @@ function CompanyPage({ id }: { id: number }) {
       {panel === 'merge' && (
         <CompanyChooser
           title={`Merge ${c.name} into which company?`}
-          description="All its contacts, visits, follow-ups, requirements and deals move to the company you choose. This one is then closed. It can’t be undone from the app."
+          description="All its contacts, opportunities, follow-ups, requirements and opportunities move to the company you choose. This one is then closed. It can’t be undone from the app."
           exclude={c.id}
           reasonLabel="Why are they the same?"
           actionLabel={(other) => `Merge into ${other.name}`}
@@ -279,6 +279,7 @@ function CompanyPage({ id }: { id: number }) {
           <form onSubmit={addContact} className="p-4 sm:p-5 ts-fgrid ts-g2 !mt-0 border-b border-dashed border-line">
             <TextField label="Name" value={contact.name} onChange={(e) => setContact({ ...contact, name: e.target.value })} autoFocus required />
             <TextField label="Designation" value={contact.designation} onChange={(e) => setContact({ ...contact, designation: e.target.value })} />
+            <TextField label="Department" value={contact.department} onChange={(e) => setContact({ ...contact, department: e.target.value })} />
             <TextField label="Phone" type="tel" inputMode="tel" value={contact.phone} onChange={(e) => setContact({ ...contact, phone: e.target.value })} />
             <TextField label="Email" type="email" value={contact.email} onChange={(e) => setContact({ ...contact, email: e.target.value })} />
             <div className="ts-span2 flex gap-2">
@@ -297,7 +298,7 @@ function CompanyPage({ id }: { id: number }) {
             <li key={p.id} className="px-4 sm:px-5 py-3 flex items-center justify-between gap-3">
               <span className="min-w-0">
                 <span className="block text-sm font-medium">{p.name}</span>
-                <span className="block text-xs text-ink-muted">{[p.designation, p.email].filter(Boolean).join(' · ')}</span>
+                <span className="block text-xs text-ink-muted">{[p.designation, p.department, p.email].filter(Boolean).join(' · ')}</span>
               </span>
               {p.phone && (
                 <span className="flex flex-col items-end gap-0.5 shrink-0">
@@ -316,7 +317,7 @@ function CompanyPage({ id }: { id: number }) {
 
       <Card>
         <CardHeader
-          title="Deals"
+          title="Opportunities"
           action={
             writer ? (
               <Link to="/pipeline" className="text-sm font-medium text-brand">
@@ -325,7 +326,7 @@ function CompanyPage({ id }: { id: number }) {
             ) : undefined
           }
         />
-        {c.opportunities.length === 0 && <EmptyState>No deals yet. Open one when you complete a visit with a real need.</EmptyState>}
+        {c.opportunities.length === 0 && <EmptyState>No opportunities yet. Open one when you complete an opportunity with a real need.</EmptyState>}
         <ul className="divide-y divide-dashed divide-line overflow-hidden rounded-b-card">
           {c.opportunities.map((o) => (
             <li key={o.id}>
@@ -395,8 +396,8 @@ function CompanyPage({ id }: { id: number }) {
       )}
 
       <Card>
-        <CardHeader title="Visit history" />
-        {c.visits.length === 0 && <EmptyState>No visits recorded{user?.role === 'salesperson' ? ' by you' : ''} yet.</EmptyState>}
+        <CardHeader title="Opportunity history" />
+        {c.visits.length === 0 && <EmptyState>No opportunities recorded{user?.role === 'salesperson' ? ' by you' : ''} yet.</EmptyState>}
         <ul className="divide-y divide-dashed divide-line overflow-hidden rounded-b-card">
           {c.visits.map((v) => (
             <li key={v.id}>

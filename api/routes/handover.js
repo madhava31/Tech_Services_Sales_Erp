@@ -64,7 +64,7 @@ router.post('/', async (req, res) => {
     let opportunityIds = null;
     if (req.body.opportunity_ids !== undefined) {
       if (!Array.isArray(req.body.opportunity_ids) || req.body.opportunity_ids.some((id) => !Number.isInteger(id) || id <= 0)) {
-        throw new HttpError(400, 'opportunity_ids must be a list of deal ids');
+        throw new HttpError(400, 'opportunity_ids must be a list of opportunity ids');
       }
       opportunityIds = req.body.opportunity_ids;
     }
@@ -76,7 +76,7 @@ router.post('/', async (req, res) => {
       const accounts = includeLoose ? await transferAccounts({ fromId, toId }) : { instrumentIds: [], reorderIds: [] };
       const taskIds = [...moved.taskIds, ...looseIds];
       if (moved.dealIds.length + taskIds.length + accounts.instrumentIds.length + accounts.reorderIds.length === 0) {
-        throw new HttpError(409, `${moved.from.name} has no open deals or follow-ups to hand over.`);
+        throw new HttpError(409, `${moved.from.name} has no open opportunities or follow-ups to hand over.`);
       }
       await auditHandover({ userId: req.user.id, from: moved.from, to: moved.to, dealIds: moved.dealIds, taskIds, reason, ...accounts });
       return {

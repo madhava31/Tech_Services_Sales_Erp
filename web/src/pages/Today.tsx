@@ -79,7 +79,7 @@ function WinRateCard({ month, i }: { month: Performance | null; i: number }) {
   const rate = month?.win_rate ?? null;
   return (
     <div className="ts-card ts-white ts-gauge-card" style={stagger(i)}>
-      <div className="ts-ch">Deal win rate</div>
+      <div className="ts-ch">Opportunity win rate</div>
       <div className="ts-gwrap">
         <Gauge value={(rate ?? 0) / 100} />
         <div className="ts-gval">
@@ -89,15 +89,15 @@ function WinRateCard({ month, i }: { month: Performance | null; i: number }) {
             </span>
             <span style={{ fontSize: '.5em', opacity: 0.7, marginLeft: -8 }}>%</span>
           </div>
-          <small>of closed deals won</small>
+          <small>of closed opportunities won</small>
         </div>
       </div>
-      <h4>{rate === null ? 'No closed deals yet' : rate >= 50 ? 'Winning more than you lose' : 'Room to improve'}</h4>
+      <h4>{rate === null ? 'No closed opportunities yet' : rate >= 50 ? 'Winning more than you lose' : 'Room to improve'}</h4>
       <p>
         {!month
           ? 'Loading…'
           : rate === null
-            ? 'Mark deals won or lost and the last 30 days show here.'
+            ? 'Mark opportunities won or lost and the last 30 days show here.'
             : `${month.deals_won} won and ${month.deals_lost} lost in the last 30 days.`}
       </p>
       <Link className="ts-kfoot" to="/pipeline">
@@ -184,8 +184,8 @@ export default function Today() {
         </div>
         <span className="ts-grow" />
         {writer && (
-          <Link to="/visits/new" className="ts-btn ts-dark justify-center max-[860px]:min-h-11 max-sm:w-full">
-            + Log a visit
+          <Link to="/opportunities/new" className="ts-btn ts-dark justify-center max-[860px]:min-h-11 max-sm:w-full">
+            + New opportunity
           </Link>
         )}
       </header>
@@ -215,10 +215,10 @@ export default function Today() {
             <Kpi
               i={0}
               white
-              label="Visits"
+              label="Opportunities"
               value={data.stats.visits_this_week}
               note="This week"
-              foot="See visits"
+              foot="See opportunities"
               to="/visits"
               chart={
                 trends && (
@@ -300,7 +300,7 @@ export default function Today() {
           <div className="ts-grid ts-row-half items-start order-2 min-[861px]:order-3">
             {data.draft_visits.length > 0 && (
               <Card style={stagger(4)}>
-                <CardHeader title="Visits to finish" description="Record the outcome and next step while it's fresh." />
+                <CardHeader title="Opportunities to finish" description="Record the outcome and next step while it's fresh." />
                 <TopOne>
                   {data.draft_visits.map((v) => (
                     <Row
@@ -323,7 +323,7 @@ export default function Today() {
 
             {data.erp_orders.length > 0 && (
               <Card style={stagger(5)}>
-                <CardHeader title="Orders received" description="The customer’s order is in the ERP, but the deal is still open. Mark it won." />
+                <CardHeader title="Orders received" description="The customer’s order is in the ERP, but the opportunity is still open. Mark it won." />
                 <TopOne>
                   {data.erp_orders.map((o) => (
                     <Row
@@ -369,7 +369,7 @@ export default function Today() {
 
             {data.overdue_deals.length > 0 && (
               <Card style={stagger(7)}>
-                <CardHeader title="Overdue deals" description="Past their expected closing date. Update the date or close them." action={<Badge>{data.overdue_deals.length}</Badge>} />
+                <CardHeader title="Overdue opportunities" description="Past their expected closing date. Update the date or close them." action={<Badge>{data.overdue_deals.length}</Badge>} />
                 <TopOne>
                   {data.overdue_deals.map((d) => (
                     <Row
@@ -395,7 +395,7 @@ export default function Today() {
 
             {data.stuck_deals.length > 0 && (
               <Card style={stagger(8)}>
-                <CardHeader title="Stuck deals" description="In the same stage for too long. Move them on, or close them." action={<Badge>{data.stuck_deals.length}</Badge>} />
+                <CardHeader title="Stuck opportunities" description="In the same stage for too long. Move them on, or close them." action={<Badge>{data.stuck_deals.length}</Badge>} />
                 <TopOne>
                   {data.stuck_deals.map((d) => (
                     <Row
@@ -430,7 +430,7 @@ export default function Today() {
 
             {data.recent_visits.length > 0 && (
               <Card style={stagger(12)}>
-                <CardHeader title="Recent visits" action={<Link to="/visits" className="text-sm font-medium text-brand shrink-0">All visits</Link>} />
+                <CardHeader title="Recent opportunities" action={<Link to="/visits" className="text-sm font-medium text-brand shrink-0">All opportunities</Link>} />
                 <TopOne>
                   {data.recent_visits.map((v) => (
                     <Row

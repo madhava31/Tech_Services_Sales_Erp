@@ -180,7 +180,7 @@ export const api = {
         method: 'POST',
         path: '/visits',
         body: data,
-        label: `Visit to ${display.company_name}`,
+        label: `Opportunity to ${display.company_name}`,
         meta: { kind: 'visit.create', uuid: data.client_uuid, visit: { ...display, company_id: data.company_id, visited_at: data.visited_at, notes: null } },
       }),
     finish: (target: { id: number } | { uuid: string }, companyName: string, data: VisitCompletion): Promise<SendResult<VisitDetail>> =>
@@ -188,7 +188,7 @@ export const api = {
         method: 'POST',
         path: 'uuid' in target ? `/visits/local:${target.uuid}/complete` : `/visits/${target.id}/complete`,
         body: data,
-        label: `Finish visit to ${companyName}`,
+        label: `Finish opportunity to ${companyName}`,
         meta: 'uuid' in target ? { kind: 'visit.complete', uuid: target.uuid } : { kind: 'visit.complete', visitId: target.id },
         queueOnly: 'uuid' in target,
       }),
@@ -667,7 +667,7 @@ export interface DealInput {
   segment_ids: number[];
   notes: string | null;
   contact_id: number | null;
-  new_contact?: { phone: string; name: string; designation?: string; email?: string };
+  new_contact?: { phone: string; name: string; designation?: string; department?: string; email?: string };
 }
 
 export interface NamedOption {
@@ -785,14 +785,16 @@ export interface Contact {
   id: number;
   name: string;
   designation: string | null;
+  department?: string | null;
   phone: string | null;
   email: string | null;
 }
 
-export type ContactInput = { name: string; designation?: string | null; phone?: string | null; email?: string | null };
+export type ContactInput = { name: string; designation?: string | null; department?: string | null; phone?: string | null; email?: string | null };
 
 export interface CompanyInput {
   name: string;
+  pincode?: string | null;
   city?: string | null;
   state?: string | null;
   contact_person?: string | null;
@@ -892,6 +894,7 @@ export interface VisitDetail extends Visit {
 
 export interface CompanyDetail extends CompanySummary {
   address: string | null;
+  pincode?: string | null;
   email: string | null;
   gstin: string | null;
   category: string | null;

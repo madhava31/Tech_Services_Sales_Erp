@@ -129,7 +129,7 @@ productsRouter.put('/:id', requireProductRole, async (req, res) => {
 });
 
 // OEMs and market segments are the same shape: a name and an active flag.
-function nameListRouter({ table, entity, label, inUseSql }) {
+function nameListRouter({ table, entity, label, inUseSql, ordered = false }) {
   const router = Router();
 
   router.get('/', async (req, res) => {
@@ -139,7 +139,7 @@ function nameListRouter({ table, entity, label, inUseSql }) {
         await db
           .prepare(
             `SELECT t.id, t.name, t.is_active, (${inUseSql})::int AS in_use FROM ${table} t
-             ${includeInactive ? '' : 'WHERE t.is_active'} ORDER BY t.name`
+             ${includeInactive ? '' : 'WHERE t.is_active'} ORDER BY ${ordered ? 't.sort_order, ' : ''}t.name`
           )
           .all()
       );
@@ -152,7 +152,9 @@ function nameListRouter({ table, entity, label, inUseSql }) {
     try {
       const name = requiredText(req.body, 'name', { max: 100 });
       const row = await db.transaction(async () => {
-        const info = await db.prepare(`INSERT INTO ${table} (name) VALUES (?) RETURNING id`).run(name);
+        const info = ordered
+          ? await db.prepare(`INSERT INTO ${table} (name, sort_order) VALUES (?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM ${table})) RETURNING id`).run(name)
+          : await db.prepare(`INSERT INTO ${table} (name) VALUES (?) RETURNING id`).run(name);
         await recordAudit({ actorUserId: req.user.id, action: `${entity}.created`, entityType: entity, entityId: info.lastInsertRowid, summary: `Added ${label} ${name}` });
         return db.prepare(`SELECT id, name, is_active FROM ${table} WHERE id = ?`).get(info.lastInsertRowid);
       });
@@ -203,5 +205,6 @@ export const segmentsRouter = nameListRouter({
   table: 'market_segment',
   entity: 'market_segment',
   label: 'market segment',
+  ordered: true,
   inUseSql: `SELECT COUNT(*) FROM opportunity_segment os WHERE os.segment_id = t.id`,
 });

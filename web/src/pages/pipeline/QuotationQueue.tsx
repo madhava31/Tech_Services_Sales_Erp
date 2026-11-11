@@ -12,7 +12,7 @@ export default function QuotationQueue() {
     <div>
       <PageHeader
         title="Quotation requests"
-        description="Customers waiting for a quotation, oldest first. Prepare it in the ERP, then record it on the deal."
+        description="Customers waiting for a quotation, oldest first. Prepare it in the ERP, then record it on the opportunity."
       />
       {queue.error && <Notice tone="error">{queue.error}</Notice>}
       <section className="ts-card ts-white ts-tcard ts-tbl !mt-0">
@@ -25,7 +25,7 @@ export default function QuotationQueue() {
                 <thead>
                   <tr>
                     <th>Company</th>
-                    <th>Deal</th>
+                    <th>Opportunity</th>
                     <th>Owner</th>
                     <th>Updated</th>
                     <th className="ts-r">Value</th>
@@ -52,7 +52,7 @@ export default function QuotationQueue() {
                       <td className="ts-r">
                         <div className="ts-racts">
                           <Link to={`/pipeline/${d.id}`} className="ts-btn ts-ghost ts-xs">
-                            Open deal
+                            Open opportunity
                           </Link>
                         </div>
                       </td>

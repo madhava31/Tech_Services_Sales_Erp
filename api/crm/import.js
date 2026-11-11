@@ -1,7 +1,7 @@
 import ExcelJS from 'exceljs';
 import db from '../db/index.js';
 import { HttpError } from './access.js';
-import { phoneTakenMessage } from './contacts.js';
+import { phoneTakenMessage, addContactPerson } from './contacts.js';
 import { parseCsvRecords } from './csv.js';
 import { assertCompanyAcceptsDeals, insertOpportunity, parseDealFields } from './deals.js';
 import { normalizeCompanyName, phoneKey } from './normalize.js';
@@ -20,6 +20,7 @@ export const COLUMNS = {
     city: ['city'],
     state: ['state'],
     address: ['address'],
+    pincode: ['pin code', 'pincode', 'pin', 'postal code'],
     phone: ['phone', 'company phone', 'telephone'],
     email: ['email', 'company email'],
     contact_person: ['contact person', 'contact'],
@@ -31,12 +32,13 @@ export const COLUMNS = {
     company: ['company', 'company name', 'customer', 'customer name'],
     name: ['contact', 'contact name', 'name'],
     designation: ['designation', 'title'],
+    department: ['department', 'dept'],
     phone: ['phone', 'mobile', 'contact number', 'customer number', 'phone number'],
     email: ['email'],
   },
   deals: {
     company: ['company', 'company name', 'customer', 'customer name'],
-    title: ['deal', 'deal name', 'title'],
+    title: ['opportunity', 'opportunity name', 'deal', 'deal name', 'title'],
     salesperson: ['salesperson', 'sales person', 'owner', 'sales engineer', 'employee code'],
     oem: ['oem', 'make'],
     products: ['products', 'product', 'part number', 'part numbers'],
@@ -62,15 +64,15 @@ const REQUIRED = {
 
 export const TEMPLATES = {
   companies: {
-    headers: ['Company', 'City', 'State', 'Address', 'Phone', 'Email', 'Contact person', 'Category', 'GSTIN', 'Parent company'],
+    headers: ['Company', 'City', 'State', 'Address', 'Pin code', 'Phone', 'Email', 'Contact person', 'Category', 'GSTIN', 'Parent company'],
     example: ['Example Labs Pvt Ltd', 'Hyderabad', 'Telangana', 'Plot 1, Example Road', '04000000000', 'info@example.com', 'Dr. Example', 'Pharma', '', ''],
   },
   contacts: {
-    headers: ['Company', 'Contact', 'Designation', 'Phone', 'Email'],
+    headers: ['Company', 'Contact', 'Designation', 'Department', 'Phone', 'Email'],
     example: ['Example Labs Pvt Ltd', 'Dr. Example', 'QC Head', '9000000000', 'qc@example.com'],
   },
   deals: {
-    headers: ['Company', 'Deal', 'Salesperson', 'OEM', 'Products', 'Expected closing date', 'Order value (INR)', 'Win probability', 'Probability reason', 'Tender', 'Market segment', 'Stage', 'Phone', 'Contact', 'Comments', 'Quotation number'],
+    headers: ['Company', 'Opportunity', 'Salesperson', 'OEM', 'Products', 'Expected closing date', 'Order value (INR)', 'Win probability', 'Probability reason', 'Tender', 'Market segment', 'Stage', 'Phone', 'Contact', 'Comments', 'Quotation number'],
     example: ['Example Labs Pvt Ltd', 'Example instrument', 'SE-001', 'PerkinElmer', 'Part number or product name; separate several with ;', '31/03/2027', '500000', '50', 'Budget confirmed', 'No', 'Pharma', 'Qualified', '9000000000', 'Dr. Example', '', ''],
   },
 };
@@ -201,6 +203,9 @@ async function checkCompanies(rows, map) {
   const phones = new Map(existing.filter((c) => c.phone).map((c) => [phoneKey(c.phone), c.name]));
   const inFile = new Map();
   const { findDuplicates } = await import('../routes/companies.js');
+  // Categories come from the market segment list; anything else is left empty with a warning.
+  const segments = await db.prepare(`SELECT name FROM market_segment WHERE is_active ORDER BY sort_order, name`).all();
+  const listed = new Map(segments.map((s) => [s.name.toLowerCase(), s.name]));
 
   const results = [];
   for (const { row, cells } of rows) {
@@ -216,6 +221,11 @@ async function checkCompanies(rows, map) {
     const email = get('email');
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) result.errors.push(`"${email}" is not a valid email.`);
     const parentName = get('parent');
+    const pincode = String(get('pincode')).replace(/\s/g, '');
+    if (pincode && !/^[0-9]{6}$/.test(pincode)) result.errors.push(`Pin code "${get('pincode')}" must be 6 digits.`);
+    const rawCategory = String(get('category')).trim();
+    const category = rawCategory ? listed.get(rawCategory.toLowerCase()) ?? null : null;
+    if (rawCategory && !category) result.warnings.push(`"${rawCategory}" isn't on the category list (${segments.map((s) => s.name).join(', ')}), so it's left empty.`);
     let parentRef = null;
     if (parentName) {
       const parentKey = normalizeCompanyName(parentName);
@@ -233,7 +243,8 @@ async function checkCompanies(rows, map) {
       phone: get('phone') || null,
       email: email || null,
       contact_person: get('contact_person') || null,
-      category: get('category') || null,
+      category,
+      pincode: pincode || null,
       gstin: get('gstin') ? get('gstin').toUpperCase() : null,
       parentRef,
     };
@@ -268,10 +279,11 @@ async function importCompanies(results, userId) {
     const parentId = d.parentRef ? d.parentRef.id ?? created.get(d.parentRef.key) : null;
     const info = await db
       .prepare(
-        `INSERT INTO company (name, normalized_name, city, state, address, phone, email, contact_person, gstin, category, parent_company_id, approval_status, approved_by, approved_at, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved', ?, NOW(), ?) RETURNING id`
+        `INSERT INTO company (name, normalized_name, city, state, address, pincode, phone, email, contact_person, gstin, category, parent_company_id, approval_status, approved_by, approved_at, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved', ?, NOW(), ?) RETURNING id`
       )
-      .run(d.name, d.normalized, d.city, d.state, d.address, d.phone, d.email, d.contact_person, d.gstin, d.category, parentId, userId, userId);
+      .run(d.name, d.normalized, d.city, d.state, d.address, d.pincode, d.phone, d.email, d.contact_person, d.gstin, d.category, parentId, userId, userId);
+    await addContactPerson({ companyId: info.lastInsertRowid, name: d.contact_person, userId });
     if (!parentId) created.set(d.normalized, info.lastInsertRowid);
     ids.push(info.lastInsertRowid);
   }
@@ -326,7 +338,7 @@ async function checkContacts(rows, map) {
       return result;
     }
     if (result.errors.length) return result;
-    result.data = { company_id: company.id, name: get('name'), designation: get('designation') || null, phone: phone || null, email: email || null };
+    result.data = { company_id: company.id, name: get('name'), designation: get('designation') || null, department: get('department') || null, phone: phone || null, email: email || null };
     if (key) byPhone.set(key, { name: get('name'), company_id: company.id, company_name: company.name });
     byName.add(`${company.id}|${nameKey(get('name'))}`);
     return result;
@@ -337,8 +349,8 @@ async function importContacts(results, userId) {
   const ids = [];
   for (const { data: d } of results) {
     const info = await db
-      .prepare(`INSERT INTO company_contact (company_id, name, designation, phone, email, created_by) VALUES (?, ?, ?, ?, ?, ?) RETURNING id`)
-      .run(d.company_id, d.name, d.designation, d.phone, d.email, userId);
+      .prepare(`INSERT INTO company_contact (company_id, name, designation, department, phone, email, created_by) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`)
+      .run(d.company_id, d.name, d.designation, d.department, d.phone, d.email, userId);
     ids.push(info.lastInsertRowid);
   }
   return ids;
@@ -356,6 +368,10 @@ async function checkDeals(rows, map) {
   }
   const oems = new Map((await db.prepare(`SELECT id, name FROM oem WHERE is_active`).all()).map((o) => [nameKey(o.name), o]));
   const segments = new Map((await db.prepare(`SELECT id, name FROM market_segment WHERE is_active`).all()).map((s) => [nameKey(s.name), s]));
+  // Files made before the list was renamed still use the old names.
+  for (const [old, current] of [['R&A', 'Research & Analytics'], ['Applied (non-pharma)', 'Non-pharma'], ['Food (R&A, not R&D)', 'Food']]) {
+    if (!segments.has(nameKey(old)) && segments.has(nameKey(current))) segments.set(nameKey(old), segments.get(nameKey(current)));
+  }
   const products = await db.prepare(`SELECT id, part_number, name, oem_id FROM product WHERE is_active`).all();
   const contacts = await db
     .prepare(`SELECT cc.id, cc.name, cc.phone, cc.company_id, c.name AS company_name FROM company_contact cc JOIN company c ON c.id = cc.company_id WHERE cc.archived_at IS NULL AND cc.phone IS NOT NULL`)
@@ -376,7 +392,7 @@ async function checkDeals(rows, map) {
 
     if (company && dealKeys.has(`${company.id}|${nameKey(get('title'))}`)) {
       result.status = 'skip';
-      result.warnings.push('This open deal already exists on this company, so this row will be skipped.');
+      result.warnings.push('This open opportunity already exists on this company, so this row will be skipped.');
       continue;
     }
 
@@ -414,10 +430,10 @@ async function checkDeals(rows, map) {
     let stage = 'new_prospect';
     if (get('stage')) {
       stage = STAGE_NAMES[nameKey(get('stage'))] ?? get('stage');
-      if (!OPEN_STAGES.includes(stage)) result.errors.push(`"${get('stage')}" is not an open stage. Import only open deals.`);
+      if (!OPEN_STAGES.includes(stage)) result.errors.push(`"${get('stage')}" is not an open stage. Import only open opportunities.`);
     }
     const quotation = get('quotation_number');
-    if (['quotation_sent', 'negotiation'].includes(stage) && !quotation) result.errors.push('A deal at this stage needs its quotation number.');
+    if (['quotation_sent', 'negotiation'].includes(stage) && !quotation) result.errors.push('An opportunity at this stage needs its quotation number.');
 
     let contactId = null;
     let newContact;

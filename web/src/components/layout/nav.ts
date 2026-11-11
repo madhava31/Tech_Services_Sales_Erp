@@ -11,20 +11,20 @@ const notSalesperson: Show = (role) => role !== undefined && role !== 'salespers
 export const NAV: NavEntry[] = [
   { kind: 'link', label: 'Today', path: '/', exact: true },
   { kind: 'group', key: 'sales', label: 'Sales', items: [
-    { label: 'Visits', path: '/visits', desc: 'Customer visits, newest first' },
-    { label: 'Pipeline', path: '/pipeline', desc: 'Deals by stage' },
+    { label: 'Opportunities', path: '/opportunities', desc: 'Every opportunity, as a list' },
+    { label: 'Pipeline', path: '/pipeline', desc: 'Opportunities by stage' },
     { label: 'Follow-ups', path: '/tasks', desc: 'What needs doing next' },
     { label: 'Quotation requests', path: '/quotation-requests', desc: 'Requests waiting for a quotation', show: canRecordQuotations },
   ] },
   { kind: 'group', key: 'accounts', label: 'Accounts', items: [
     { label: 'Companies', path: '/companies', desc: 'Shared list of customer companies' },
-    { label: 'Tenders', path: '/tenders', desc: 'Deals marked as tenders' },
+    { label: 'Tenders', path: '/tenders', desc: 'Opportunities marked as tenders' },
     { label: 'Renewals', path: '/renewals', desc: 'Renewals and reorders' },
     { label: 'Products', path: '/products', desc: 'What we sell, by make' },
   ] },
   { kind: 'group', key: 'insights', label: 'Insights', items: [
     { label: 'Performance', path: '/performance', desc: 'Your numbers, or the team’s' },
-    { label: 'Sales analysis', path: '/analysis', desc: 'Where deals drop out, and what should close when' },
+    { label: 'Sales analysis', path: '/analysis', desc: 'Where opportunities drop out, and what should close when' },
     { label: 'Weekly report', path: '/reports', desc: 'Weekly sales report', show: notSalesperson },
   ] },
   { kind: 'group', key: 'manage', label: 'Manage', items: [

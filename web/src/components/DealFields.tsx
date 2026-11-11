@@ -10,7 +10,7 @@ export const WIN_PROBABILITIES = [25, 50, 75, 100];
 export interface DealDraft {
   title: string;
   contactId: string; // a contact id, '' for none, or NEW_CONTACT
-  newContact: { phone: string; name: string; designation: string; email: string };
+  newContact: { phone: string; name: string; designation: string; department?: string; email: string };
   oemId: string;
   productIds: number[];
   closeDate: string;
@@ -25,7 +25,7 @@ export interface DealDraft {
 export const EMPTY_DEAL_DRAFT: DealDraft = {
   title: '',
   contactId: '',
-  newContact: { phone: '', name: '', designation: '', email: '' },
+  newContact: { phone: '', name: '', designation: '', department: '', email: '' },
   oemId: '',
   productIds: [],
   closeDate: '',
@@ -164,7 +164,7 @@ export default function DealFields({
   return (
     <div className="ts-fgrid ts-g2 !mt-0">
       <div className="ts-span2 min-w-0">
-        <TextField label="Deal name" value={value.title} onChange={(e) => onChange({ title: e.target.value })} placeholder="e.g. AAS for QC lab" required />
+        <TextField label="Opportunity name" value={value.title} onChange={(e) => onChange({ title: e.target.value })} placeholder="e.g. AAS for QC lab" required />
       </div>
 
       <div className="ts-span2 min-w-0">
@@ -185,6 +185,7 @@ export default function DealFields({
           <TextField label="Phone" type="tel" inputMode="tel" value={value.newContact.phone} onChange={(e) => onChange({ newContact: { ...value.newContact, phone: e.target.value } })} required />
           <TextField label="Name" value={value.newContact.name} onChange={(e) => onChange({ newContact: { ...value.newContact, name: e.target.value } })} required />
           <TextField label="Designation" value={value.newContact.designation} onChange={(e) => onChange({ newContact: { ...value.newContact, designation: e.target.value } })} />
+          <TextField label="Department" value={value.newContact.department ?? ''} onChange={(e) => onChange({ newContact: { ...value.newContact, department: e.target.value } })} />
           <TextField label="Email" type="email" value={value.newContact.email} onChange={(e) => onChange({ newContact: { ...value.newContact, email: e.target.value } })} />
         </fieldset>
       )}

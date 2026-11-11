@@ -91,7 +91,7 @@ export default function VisitDetail() {
     <div className="max-w-3xl flex flex-col gap-4">
       <header className="ts-phead !block !mb-1">
         <Link to="/visits" className="ts-back">
-          ← Visits
+          ← Opportunities
         </Link>
         <Link to={`/companies/${visit.company_id}`} className="ts-title block hover:text-brand">
           {visit.company_name}
@@ -138,7 +138,7 @@ export function LocalVisitDetail() {
     })();
   }, [uuid, navigate]);
 
-  if (missing) return <Notice tone="error">This visit isn’t on this phone any more.</Notice>;
+  if (missing) return <Notice tone="error">This opportunity isn’t on this phone any more.</Notice>;
   if (!visit) return <LoadingCard />;
   return (
     <div className="max-w-3xl flex flex-col gap-4">
@@ -165,7 +165,7 @@ function CompletedVisit({ visit }: { visit: Visit }) {
         </div>
         {visit.opportunity_id && (
           <Link to={`/pipeline/${visit.opportunity_id}`} className="mt-2 inline-block text-sm font-medium text-brand">
-            Deal: {visit.opportunity_title}
+            Opportunity: {visit.opportunity_title}
             {visit.opportunity_stage && ` · ${STAGE_LABELS[visit.opportunity_stage]}`}
           </Link>
         )}
@@ -327,7 +327,7 @@ function CompleteVisitForm({ visit, localUuid, onCompleted, onQueued }: { visit:
         onQueued();
       } else onCompleted(result.data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not complete the visit.');
+      setError(err instanceof Error ? err.message : 'Could not complete the opportunity.');
     } finally {
       setBusy(false);
     }
@@ -349,7 +349,7 @@ function CompleteVisitForm({ visit, localUuid, onCompleted, onQueued }: { visit:
 
       <Card>
         <CardHeader title="How did it go?" />
-        <div className="p-4 sm:p-5 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Visit outcome">
+        <div className="p-4 sm:p-5 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Opportunity outcome">
           {(Object.keys(OUTCOME_LABELS) as Outcome[]).map((o) => (
             <button
               key={o}
@@ -455,26 +455,26 @@ function CompleteVisitForm({ visit, localUuid, onCompleted, onQueued }: { visit:
       )}
 
       {draft.outcome !== '' && companyApproved && (!online || localUuid) && OUTCOME_CAN_OPEN_DEAL.includes(draft.outcome) && (
-        <p className="text-sm text-ink-muted">Opening a new deal needs a connection. Finish the visit now and open the deal once you’re back online.</p>
+        <p className="text-sm text-ink-muted">Opening a new opportunity needs a connection. Finish the opportunity now and open the opportunity once you’re back online.</p>
       )}
 
       {draft.outcome !== '' && !companyApproved && OUTCOME_CAN_OPEN_DEAL.includes(draft.outcome) && (
         <Notice tone="error">
-          {visit.company_name} is waiting for a manager’s approval. You can complete this visit now and open a deal once it is approved.
+          {visit.company_name} is waiting for a manager’s approval. You can complete this opportunity now and open an opportunity once it is approved.
         </Notice>
       )}
 
       {draft.outcome !== '' && (openDeals.length > 0 || canOpenDeal) && (
         <Card>
           <CardHeader
-            title="Deal"
+            title="Opportunity"
             description={
               draft.outcome === 'quotation_requested'
-                ? 'Link the quotation request to a deal so the office sees it in their queue.'
-                : 'Track this as part of a deal in the pipeline.'
+                ? 'Link the quotation request to an opportunity so the office sees it in their queue.'
+                : 'Track this as part of an opportunity in the pipeline.'
             }
           />
-          <div className="p-4 sm:p-5 flex flex-col gap-3" role="radiogroup" aria-label="Deal">
+          <div className="p-4 sm:p-5 flex flex-col gap-3" role="radiogroup" aria-label="Opportunity">
             {openDeals.map((o) => (
               <label key={o.id} className="flex items-start gap-2 text-sm max-[860px]:min-h-11 max-[860px]:items-center">
                 <input
@@ -496,12 +496,12 @@ function CompleteVisitForm({ visit, localUuid, onCompleted, onQueued }: { visit:
             {canOpenDeal && (
               <label className="flex items-center gap-2 text-sm max-[860px]:min-h-11">
                 <input type="radio" name="deal" className="ts-chk shrink-0" checked={deal.mode === 'new'} onChange={() => setDeal({ mode: 'new' })} />
-                <span className="font-medium">Open a new deal</span>
+                <span className="font-medium">Open a new opportunity</span>
               </label>
             )}
             <label className="flex items-center gap-2 text-sm max-[860px]:min-h-11">
               <input type="radio" name="deal" className="ts-chk shrink-0" checked={deal.mode === 'none'} onChange={() => setDeal({ mode: 'none' })} />
-              Not part of a deal
+              Not part of an opportunity
             </label>
             {deal.mode === 'new' && canOpenDeal && (
               <div className="mt-1">
@@ -514,7 +514,7 @@ function CompleteVisitForm({ visit, localUuid, onCompleted, onQueued }: { visit:
 
       <div className="sticky bottom-20 lg:bottom-4 z-10">
         <Button type="submit" className="w-full h-12 shadow-lg" disabled={busy || !draft.outcome || (deal.mode === 'new' && canOpenDeal && !dealDraftComplete(dealFields))}>
-          {busy ? 'Saving…' : draft.outcome ? 'Complete visit' : 'Choose how it went to complete'}
+          {busy ? 'Saving…' : draft.outcome ? 'Complete opportunity' : 'Choose how it went to complete'}
         </Button>
       </div>
     </form>

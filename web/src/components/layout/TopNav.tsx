@@ -7,7 +7,8 @@ import { NAV, activeEntry, linkActive } from './nav';
 
 /**
  * Centred pill navigation. An accent pill slides between items. When moving right, the right edge leads and the
- * left edge follows (and the reverse), which gives the stretch effect. Phones use the dock and More page instead.
+ * left edge follows (and the reverse), which gives the stretch effect. On narrow screens it has its own row and
+ * scrolls sideways, as in the ERP.
  */
 export function TopNav({ role }: { role: Role | undefined }) {
   const { pathname } = useLocation();
@@ -42,7 +43,7 @@ export function TopNav({ role }: { role: Role | undefined }) {
   }, []);
 
   return (
-    <div className="ts-navwrap max-[860px]:hidden">
+    <div className="ts-navwrap">
       <nav className="ts-nav" ref={navRef} aria-label="Main">
         <span className="ts-nav-ind" ref={indRef} aria-hidden="true" />
         {NAV.map((e) => {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { BellIcon, LogOutIcon, PlusIcon } from 'lucide-react';
+import companyLogo from '../assets/brand/technicon-logo.png';
 import { api } from '../lib/api';
 import { syncOutbox, useOutbox } from '../lib/outbox';
 import { useAuth } from '../lib/auth';
@@ -11,15 +12,11 @@ import { Dock } from './layout/Dock';
 import { TopNav } from './layout/TopNav';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './layout/dropdown-menu';
 
+// The company logo exactly as supplied, as the ERP shows it.
 function Brand() {
   return (
-    <Link to="/" className="ts-brand" aria-label="Technicon Sales, Today">
-      <span className="ts-logo-wrap">
-        <img src="/icon-64.png" alt="" className="ts-logo" />
-      </span>
-      <span className="ts-bn">
-        <span className="ts-brand-name"><b>TECHNICON</b> SALES</span>
-      </span>
+    <Link to="/" className="ts-brand" aria-label="Technicon Services, Today">
+      <img className="ts-brand-logo" src={companyLogo} alt="Technicon Services - Advancing Analytical Science" width={207} height={44} />
     </Link>
   );
 }
@@ -84,7 +81,7 @@ export default function Layout() {
     return () => window.removeEventListener('notifications-read', cleared);
   }, [location.pathname]);
 
-  // "N" logs a visit from anywhere, unless the person is typing.
+  // "N" starts a new opportunity from anywhere, unless the person is typing.
   useEffect(() => {
     if (!canLogVisit) return;
     const onKey = (e: KeyboardEvent) => {
@@ -94,7 +91,7 @@ export default function Layout() {
       const openOverlay = [...document.querySelectorAll('[role="dialog"],[aria-modal="true"],[role="menu"]')].some((el) => el.getClientRects().length > 0);
       if (openOverlay) return;
       e.preventDefault();
-      navigate('/visits/new');
+      navigate('/opportunities/new');
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -107,9 +104,9 @@ export default function Layout() {
         <TopNav role={user?.role} />
         <div className="ts-acts">
           {canLogVisit && (
-            <Link to="/visits/new" className="ts-newq" title="Log a visit (press N)" aria-label="Log a visit">
+            <Link to="/opportunities/new" className="ts-newq" title="New opportunity (press N)" aria-label="New opportunity">
               <PlusIcon aria-hidden="true" />
-              <span>Log a visit</span>
+              <span>New opportunity</span>
               <kbd>N</kbd>
             </Link>
           )}

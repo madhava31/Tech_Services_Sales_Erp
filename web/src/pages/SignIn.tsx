@@ -1,16 +1,12 @@
 import { useState } from 'react';
+import companyLogo from '../assets/brand/technicon-logo.png';
 import { useAuth } from '../lib/auth';
 import { Button, Notice, TextField } from '../components/ui';
 
 function Brand() {
   return (
     <span className="ts-brand">
-      <span className="ts-logo-wrap">
-        <img src="/icon-64.png" alt="" className="ts-logo" />
-      </span>
-      <span className="ts-bn">
-        <span className="ts-brand-name"><b>TECHNICON</b> SALES</span>
-      </span>
+      <img className="ts-brand-logo" src={companyLogo} alt="Technicon Services - Advancing Analytical Science" width={207} height={44} />
     </span>
   );
 }
@@ -45,8 +41,8 @@ export default function SignIn({ mode }: { mode: 'login' | 'setup' }) {
         <Brand />
 
         <div className="flex flex-col gap-5 max-w-[460px]">
-          <p className="m-0 text-[40px] font-medium tracking-[-.025em] leading-[1.1] text-pretty">Visits, deals and follow-ups, in one view.</p>
-          <p className="m-0 text-[14.5px] leading-[1.6] opacity-65 text-pretty">Log a visit from the customer’s site, keep the pipeline moving, and see what needs doing next.</p>
+          <p className="m-0 text-[40px] font-medium tracking-[-.025em] leading-[1.1] text-pretty">Opportunities, opportunities and follow-ups, in one view.</p>
+          <p className="m-0 text-[14.5px] leading-[1.6] opacity-65 text-pretty">Log an opportunity from the customer’s site, keep the pipeline moving, and see what needs doing next.</p>
         </div>
 
         {/* Decorative trend curve in the brand chart colours */}

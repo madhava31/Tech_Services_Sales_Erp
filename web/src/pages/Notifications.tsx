@@ -41,7 +41,7 @@ export default function Notifications() {
 
   return (
     <div className="max-w-3xl flex flex-col gap-4">
-      <PageHeader title="Reminders" description="Your follow-ups and overdue deals, each working morning." />
+      <PageHeader title="Reminders" description="Your follow-ups and overdue opportunities, each working morning." />
       {error && <Notice tone="error" onDismiss={() => setError('')}>{error}</Notice>}
       {list.error && <Notice tone="error">{list.error}</Notice>}
       <Card className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">

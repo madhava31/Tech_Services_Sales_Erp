@@ -23,7 +23,7 @@ export async function transferDeals({ fromId, toId, opportunityIds, reason, user
     )
     .all(...(opportunityIds ? [fromId, opportunityIds] : [fromId]));
   if (opportunityIds && deals.length !== new Set(opportunityIds).size) {
-    throw new HttpError(409, `Some of those deals are no longer open deals of ${from.name}. Reload and try again.`);
+    throw new HttpError(409, `Some of those opportunities are no longer open opportunities of ${from.name}. Reload and try again.`);
   }
 
   const dealIds = deals.map((d) => d.id);
@@ -67,8 +67,8 @@ export async function auditHandover({ userId, from, to, dealIds, taskIds, reason
     entityType: single ? 'opportunity' : 'salesperson',
     entityId: single ? dealIds[0] : from.id,
     summary: single
-      ? `Transferred deal to ${to.name} from ${from.name}: ${reason}`
-      : `Handed over ${dealIds.length} deal(s), ${taskIds.length} follow-up(s), ${instrumentIds.length} instrument(s) and ${reorderIds.length} reorder(s) from ${from.name} to ${to.name}: ${reason}`,
+      ? `Transferred opportunity to ${to.name} from ${from.name}: ${reason}`
+      : `Handed over ${dealIds.length} opportunities, ${taskIds.length} follow-up(s), ${instrumentIds.length} instrument(s) and ${reorderIds.length} reorder(s) from ${from.name} to ${to.name}: ${reason}`,
     before: { owner_salesperson_id: from.id },
     after: { owner_salesperson_id: to.id, opportunity_ids: dealIds, task_ids: taskIds, instrument_ids: instrumentIds, reorder_ids: reorderIds },
   });

@@ -26,11 +26,11 @@ export function Dock({ canLogVisit }: { canLogVisit: boolean }) {
       <DockLink to="/" label="Today" on={pathname === '/'} className={PHONE_ONLY}>
         <HouseIcon />
       </DockLink>
-      <DockLink to="/visits" label="Visits" on={under('/visits')} className={PHONE_ONLY}>
+      <DockLink to="/opportunities" label="Opportunities" on={pathname === '/opportunities'} className={PHONE_ONLY}>
         <MapPinIcon />
       </DockLink>
       {canLogVisit && (
-        <DockLink to="/visits/new" label="Log a visit" on={pathname === '/visits/new'} className={DESKTOP_ONLY}>
+        <DockLink to="/opportunities/new" label="New opportunity" on={pathname === '/opportunities/new'} className={DESKTOP_ONLY}>
           <PlusIcon />
         </DockLink>
       )}

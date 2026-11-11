@@ -6,6 +6,8 @@ import SignIn from './pages/SignIn';
 import Today from './pages/Today';
 import Visits from './pages/visits/Visits';
 import NewVisit from './pages/visits/NewVisit';
+import NewOpportunity from './pages/pipeline/NewOpportunity';
+import Opportunities from './pages/pipeline/Opportunities';
 import VisitDetail, { LocalVisitDetail } from './pages/visits/VisitDetail';
 import Companies from './pages/companies/Companies';
 import CompanyDetail from './pages/companies/CompanyDetail';
@@ -46,6 +48,8 @@ export default function App() {
         <Route index element={<Today />} />
         <Route path="visits" element={<Visits />} />
         {canWriteCrm(user.role) && <Route path="visits/new" element={<NewVisit />} />}
+        <Route path="opportunities" element={<Opportunities />} />
+        {canWriteCrm(user.role) && <Route path="opportunities/new" element={<NewOpportunity />} />}
         <Route path="visits/local/:uuid" element={<LocalVisitDetail />} />
         <Route path="visits/:id" element={<VisitDetail />} />
         <Route path="notifications" element={<Notifications />} />

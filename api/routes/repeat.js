@@ -107,7 +107,7 @@ installedRouter.post('/', async (req, res) => {
     const links = await checkLinks(req.body, company.id);
     const opportunityId = optionalId(req.body, 'opportunity_id');
     if (opportunityId && !(await db.prepare(`SELECT id FROM opportunity WHERE id = ? AND company_id = ?`).get(opportunityId, company.id))) {
-      throw new HttpError(400, 'That deal does not belong to this company.');
+      throw new HttpError(400, 'That opportunity does not belong to this company.');
     }
     const id = await db.transaction(async () => {
       const info = await db

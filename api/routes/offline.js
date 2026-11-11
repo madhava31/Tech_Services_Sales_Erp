@@ -12,7 +12,7 @@ router.get('/bootstrap', requireCrmWriter, async (req, res) => {
     const companies = await db
       .prepare(
         `SELECT c.id, c.name, c.city, c.state, c.phone, c.approval_status, c.parent_company_id,
-                (SELECT COALESCE(json_agg(json_build_object('id', cc.id, 'name', cc.name, 'designation', cc.designation, 'phone', cc.phone, 'email', cc.email) ORDER BY cc.name), '[]')
+                (SELECT COALESCE(json_agg(json_build_object('id', cc.id, 'name', cc.name, 'designation', cc.designation, 'department', cc.department, 'phone', cc.phone, 'email', cc.email) ORDER BY cc.name), '[]')
                  FROM company_contact cc WHERE cc.company_id = c.id AND cc.archived_at IS NULL) AS contacts
          FROM company c WHERE c.archived_at IS NULL AND c.approval_status <> 'rejected' ORDER BY c.name LIMIT 5000`
       )

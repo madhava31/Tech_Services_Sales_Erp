@@ -54,14 +54,14 @@ async function pushToUser(userId, payload) {
   }
 }
 
-const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+const plural = (n, word, many = `${word}s`) => `${n} ${n === 1 ? word : many}`;
 
 function digestText({ dueToday, overdueTasks, overdueDeals, stuckDeals, tendersDue }) {
   const parts = [];
   if (dueToday) parts.push(`${plural(dueToday, 'follow-up')} due today`);
   if (overdueTasks) parts.push(`${plural(overdueTasks, 'follow-up')} overdue`);
-  if (overdueDeals) parts.push(`${plural(overdueDeals, 'deal')} past closing date`);
-  if (stuckDeals) parts.push(`${plural(stuckDeals, 'deal')} stuck`);
+  if (overdueDeals) parts.push(`${plural(overdueDeals, 'opportunity', 'opportunities')} past closing date`);
+  if (stuckDeals) parts.push(`${plural(stuckDeals, 'opportunity', 'opportunities')} stuck`);
   if (tendersDue) parts.push(`${plural(tendersDue, 'tender')} due soon`);
   return parts.join(', ');
 }

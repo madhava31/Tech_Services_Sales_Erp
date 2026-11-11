@@ -105,9 +105,9 @@ test('the morning reminder mentions stuck deals, to the owner and to managers', 
   await deal(priya, { path: [['qualified', 100]], title: 'Very stuck' });
   await runDailyReminders({ send: async () => undefined });
   const mine = (await priya.client.request('GET', '/api/notifications')).body;
-  assert.match(mine.items[0].body, /1 deal stuck/);
+  assert.match(mine.items[0].body, /1 opportunity stuck/);
   const team = (await manager.request('GET', '/api/notifications')).body;
-  assert.match(team.items[0].body, /1 deal stuck/);
+  assert.match(team.items[0].body, /1 opportunity stuck/);
 });
 
 test('stuck limits: everyone can read them, only MD/Admin change them, and it is audited', async () => {

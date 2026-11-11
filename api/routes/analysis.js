@@ -215,7 +215,7 @@ router.put('/stage-settings/:stage', async (req, res) => {
         actorUserId: req.user.id,
         action: 'stage_setting.updated',
         entityType: 'stage_setting',
-        summary: `Deals at ${req.params.stage} now count as stuck after ${days} days (was ${before.stuck_after_days})`,
+        summary: `Opportunities at ${req.params.stage} now count as stuck after ${days} days (was ${before.stuck_after_days})`,
         before,
         after: { stuck_after_days: days },
       });

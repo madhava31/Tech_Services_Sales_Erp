@@ -21,7 +21,7 @@ export function requirementFields(body) {
 export function parseRequirementList(list) {
   if (list === undefined || list === null) return [];
   if (!Array.isArray(list)) throw new HttpError(400, 'requirements must be a list');
-  if (list.length > 20) throw new HttpError(400, 'At most 20 requirements per visit');
+  if (list.length > 20) throw new HttpError(400, 'At most 20 requirements per opportunity');
   return list.map((item, i) => {
     try {
       return requirementFields(item);

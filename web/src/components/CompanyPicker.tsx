@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { api, CompanySummary, DuplicateCandidate } from '../lib/api';
-import { Badge, Button, Notice, TextField } from './ui';
+import { api, CompanySummary, DuplicateCandidate, NamedOption } from '../lib/api';
+import { Badge, Button, Notice, SelectField, TextField } from './ui';
 
 function useDebounced<T>(value: T, ms = 250) {
   const [debounced, setDebounced] = useState(value);
@@ -93,8 +93,14 @@ function NewCompanyForm({
   onCreated: (c: CompanySummary & { primary_contact_id?: number | null }) => void;
   onUseExisting: (c: CompanySummary) => void;
 }) {
-  const [form, setForm] = useState({ name: initialName, city: '', state: '', phone: '', email: '', address: '', contact_person: '', category: '' });
-  const [contact, setContact] = useState({ name: '', designation: '', phone: '' });
+  const [form, setForm] = useState({ name: initialName, city: '', state: '', phone: '', email: '', address: '', pincode: '', contact_person: '', category: '' });
+  // The contact person's role, saved with them as a contact.
+  const [contact, setContact] = useState({ designation: '', department: '' });
+  // The category list is the market segment list an admin keeps, in its set order.
+  const [categories, setCategories] = useState<NamedOption[]>([]);
+  useEffect(() => {
+    api.catalogue.segments().then(setCategories).catch(() => setCategories([]));
+  }, []);
   // Set when this is a second plant or office of a company already registered.
   const [parent, setParent] = useState<DuplicateCandidate | null>(null);
   const [duplicates, setDuplicates] = useState<DuplicateCandidate[]>([]);
@@ -133,7 +139,7 @@ function NewCompanyForm({
       const created = await api.companies.create({
         ...form,
         confirm_new: confirmNew,
-        contact: contact.name.trim() ? contact : undefined,
+        contact: form.contact_person.trim() ? { name: form.contact_person.trim(), designation: contact.designation, department: contact.department } : undefined,
         parent_company_id: parent?.id,
       });
       onCreated(created);
@@ -159,13 +165,23 @@ function NewCompanyForm({
       )}
       <div className="ts-fgrid ts-g2 !mt-0">
         <TextField label="Company name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required autoFocus />
+        <SelectField label="Category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+          <option value="">Select…</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.name}>
+              {c.name}
+            </option>
+          ))}
+        </SelectField>
         <TextField label="City" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
         <TextField label="State" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} />
-        <TextField label="Category" placeholder="e.g. Pharma, Food testing" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
-        <TextField label="Contact person" value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} />
-        <TextField label="Company email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-        <TextField label="Company phone" type="tel" inputMode="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
         <TextField label="Address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+        <TextField label="Pin code" inputMode="numeric" maxLength={6} value={form.pincode} onChange={(e) => setForm({ ...form, pincode: e.target.value.replace(/\D/g, '') })} />
+        <TextField label="Contact person" hint="Saved as a contact, so it can be chosen on opportunities." value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} />
+        <TextField label="Designation" value={contact.designation} onChange={(e) => setContact({ ...contact, designation: e.target.value })} />
+        <TextField label="Department" value={contact.department} onChange={(e) => setContact({ ...contact, department: e.target.value })} />
+        <TextField label="Company phone" type="tel" inputMode="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+        <TextField label="Company email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
       </div>
 
       {duplicates.length > 0 && (
@@ -200,13 +216,6 @@ function NewCompanyForm({
           )}
         </div>
       )}
-
-      <fieldset className="ts-fgrid ts-g3 !mt-0 rounded-lg border border-line p-3">
-        <legend className="ts-lbl !mb-0 px-1">Person you're meeting (optional)</legend>
-        <TextField label="Name" value={contact.name} onChange={(e) => setContact({ ...contact, name: e.target.value })} />
-        <TextField label="Designation" value={contact.designation} onChange={(e) => setContact({ ...contact, designation: e.target.value })} />
-        <TextField label="Phone" type="tel" inputMode="tel" value={contact.phone} onChange={(e) => setContact({ ...contact, phone: e.target.value })} />
-      </fieldset>
 
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={busy || !form.name.trim() || !!exact || (duplicates.length > 0 && !confirmNew)}>

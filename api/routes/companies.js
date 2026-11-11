@@ -4,7 +4,7 @@ import { recordAudit } from '../audit/log.js';
 import { normalizeCompanyName, phoneKey } from '../crm/normalize.js';
 import { HttpError, isManaging, requireCrmWriter, scopeFilter, sendError } from '../crm/access.js';
 import { assertValidParent, mergeCompanies } from '../crm/companies.js';
-import { contactFields, findContactByPhone, insertContact, phoneTakenMessage } from '../crm/contacts.js';
+import { contactFields, findContactByPhone, insertContact, phoneTakenMessage, addContactPerson } from '../crm/contacts.js';
 import { TODAY_SQL, optionalEmail, optionalId, optionalText, requiredText } from '../crm/fields.js';
 
 // Mounted at /api/companies (signed-in users). The registry itself is shared — everyone must be
@@ -27,9 +27,19 @@ function companyFields(body, { partial }) {
     category: body.category === undefined && partial ? undefined : optionalText(body, 'category', { max: 100 }),
     state: body.state === undefined && partial ? undefined : optionalText(body, 'state', { max: 100 }),
     contact_person: body.contact_person === undefined && partial ? undefined : optionalText(body, 'contact_person', { max: 120 }),
+    pincode: body.pincode === undefined && partial ? undefined : optionalText(body, 'pincode', { max: 6 }),
   };
+  if (fields.pincode && !/^[0-9]{6}$/.test(fields.pincode)) throw new HttpError(400, 'Pin code must be 6 digits.');
   if (fields.gstin) fields.gstin = fields.gstin.toUpperCase();
   return fields;
+}
+
+// The category comes from the market segment list an admin keeps, spelled as it is there.
+async function listedCategory(value) {
+  if (!value) return null;
+  const row = await db.prepare(`SELECT name FROM market_segment WHERE is_active AND lower(name) = lower(?)`).get(value.trim());
+  if (!row) throw new HttpError(400, 'Choose a category from the list.');
+  return row.name;
 }
 
 // Possible duplicates of a company being created or renamed: similar normalized names, or the
@@ -175,7 +185,7 @@ router.get('/:id', async (req, res) => {
 
     const contacts = await db
       .prepare(
-        `SELECT id, name, designation, phone, email, created_at FROM company_contact
+        `SELECT id, name, designation, department, phone, email, created_at FROM company_contact
          WHERE company_id = ? AND archived_at IS NULL ORDER BY name`
       )
       .all(id);
@@ -248,6 +258,7 @@ router.get('/:id', async (req, res) => {
 router.post('/', requireCrmWriter, async (req, res) => {
   try {
     const fields = companyFields(req.body, { partial: false });
+    fields.category = await listedCategory(fields.category);
     const parentId = optionalId(req.body, 'parent_company_id');
     if (parentId) await assertValidParent(parentId);
     const duplicates = await findDuplicates({ ...fields, parentId });
@@ -269,15 +280,17 @@ router.post('/', requireCrmWriter, async (req, res) => {
     const created = await db.transaction(async () => {
       const info = await db
         .prepare(
-          `INSERT INTO company (name, normalized_name, city, state, address, phone, email, contact_person, gstin, category, parent_company_id, approval_status, approved_by, approved_at, created_by)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ?::boolean THEN NOW() END, ?) RETURNING id`
+          `INSERT INTO company (name, normalized_name, city, state, address, pincode, phone, email, contact_person, gstin, category, parent_company_id, approval_status, approved_by, approved_at, created_by)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ?::boolean THEN NOW() END, ?) RETURNING id`
         )
-        .run(fields.name, normalizeCompanyName(fields.name), fields.city, fields.state, fields.address, fields.phone, fields.email, fields.contact_person, fields.gstin, fields.category, parentId, approved ? 'approved' : 'pending', approved ? req.user.id : null, approved, req.user.id);
+        .run(fields.name, normalizeCompanyName(fields.name), fields.city, fields.state, fields.address, fields.pincode, fields.phone, fields.email, fields.contact_person, fields.gstin, fields.category, parentId, approved ? 'approved' : 'pending', approved ? req.user.id : null, approved, req.user.id);
       const companyId = info.lastInsertRowid;
       let contactId = null;
       if (contact) {
         contactId = await insertContact({ companyId, fields: contact, userId: req.user.id });
       }
+      const personId = await addContactPerson({ companyId, name: fields.contact_person, userId: req.user.id });
+      contactId = contactId ?? personId;
       await recordAudit({
         actorUserId: req.user.id,
         action: 'company.created',
@@ -349,6 +362,8 @@ router.put('/:id', requireCrmWriter, async (req, res) => {
     const existing = await db.prepare(`SELECT * FROM company WHERE id = ? AND archived_at IS NULL`).get(id);
     if (!existing) return res.status(404).json({ error: 'Company not found' });
     const changes = companyFields(req.body, { partial: true });
+    // An older free-text category can stay as it is; a new one must come from the list.
+    if (changes.category !== undefined && changes.category !== existing.category) changes.category = await listedCategory(changes.category);
     const merged = { ...existing };
     for (const [key, value] of Object.entries(changes)) if (value !== undefined) merged[key] = value;
     if (req.body.parent_company_id !== undefined) {
@@ -360,11 +375,11 @@ router.put('/:id', requireCrmWriter, async (req, res) => {
     const updated = await db.transaction(async () => {
       await db
         .prepare(
-          `UPDATE company SET name = ?, normalized_name = ?, city = ?, state = ?, address = ?, phone = ?, email = ?, contact_person = ?, gstin = ?, category = ?, parent_company_id = ?, updated_at = NOW()
+          `UPDATE company SET name = ?, normalized_name = ?, city = ?, state = ?, address = ?, pincode = ?, phone = ?, email = ?, contact_person = ?, gstin = ?, category = ?, parent_company_id = ?, updated_at = NOW()
            WHERE id = ?`
         )
-        .run(merged.name, normalizeCompanyName(merged.name), merged.city, merged.state, merged.address, merged.phone, merged.email, merged.contact_person, merged.gstin, merged.category, merged.parent_company_id, id);
-      const pick = ({ name, city, state, address, phone, email, contact_person, gstin, category, parent_company_id }) => ({ name, city, state, address, phone, email, contact_person, gstin, category, parent_company_id });
+        .run(merged.name, normalizeCompanyName(merged.name), merged.city, merged.state, merged.address, merged.pincode, merged.phone, merged.email, merged.contact_person, merged.gstin, merged.category, merged.parent_company_id, id);
+      const pick = ({ name, city, state, address, pincode, phone, email, contact_person, gstin, category, parent_company_id }) => ({ name, city, state, address, pincode, phone, email, contact_person, gstin, category, parent_company_id });
       await recordAudit({
         actorUserId: req.user.id,
         action: 'company.updated',
@@ -414,9 +429,9 @@ contactsRouter.put('/:id', requireCrmWriter, async (req, res) => {
     if (owner) throw new HttpError(409, phoneTakenMessage(owner, fields.phone));
     const updated = await db.transaction(async () => {
       await db
-        .prepare(`UPDATE company_contact SET name = ?, designation = ?, phone = ?, email = ?, updated_at = NOW() WHERE id = ?`)
-        .run(fields.name, fields.designation, fields.phone, fields.email, id);
-      const pick = ({ name, designation, phone, email }) => ({ name, designation, phone, email });
+        .prepare(`UPDATE company_contact SET name = ?, designation = ?, department = ?, phone = ?, email = ?, updated_at = NOW() WHERE id = ?`)
+        .run(fields.name, fields.designation, fields.department, fields.phone, fields.email, id);
+      const pick = ({ name, designation, department, phone, email }) => ({ name, designation, department, phone, email });
       await recordAudit({
         actorUserId: req.user.id,
         action: 'contact.updated',

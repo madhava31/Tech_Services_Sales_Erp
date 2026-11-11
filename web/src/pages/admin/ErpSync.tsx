@@ -71,7 +71,7 @@ export default function ErpSync() {
               <p className="text-xs text-ink-muted mt-1 break-words">Products skipped because their make isn’t an OEM here: {last?.counts.unknown_makes?.join(', ')}. Add them under OEMs.</p>
             )}
             {(last?.counts.quotations_mismatched ?? 0) > 0 && (
-              <p className="text-xs text-ink-muted mt-1">{last?.counts.quotations_mismatched} recorded quotation(s) have a number that belongs to a different customer in the ERP. Check them on their deals.</p>
+              <p className="text-xs text-ink-muted mt-1">{last?.counts.quotations_mismatched} recorded quotation(s) have a number that belongs to a different customer in the ERP. Check them on their opportunities.</p>
             )}
           </div>
           <Button className="shrink-0" variant="secondary" disabled={busy} onClick={() => act(api.erp.run, 'Sync finished.')}>

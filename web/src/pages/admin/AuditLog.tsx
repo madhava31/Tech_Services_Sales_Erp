@@ -4,10 +4,10 @@ import { Button, Card, EmptyState, Notice, PageHeader, SelectField, TextField } 
 
 const RECORD_TYPES = [
   { value: '', label: 'Everything' },
-  { value: 'opportunity', label: 'Deals' },
+  { value: 'opportunity', label: 'Opportunities' },
   { value: 'company', label: 'Companies' },
   { value: 'company_contact', label: 'Contacts' },
-  { value: 'visit', label: 'Visits' },
+  { value: 'visit', label: 'Opportunities' },
   { value: 'task', label: 'Follow-ups' },
   { value: 'requirement', label: 'Requirements' },
   { value: 'product', label: 'Products' },

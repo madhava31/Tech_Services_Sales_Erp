@@ -57,7 +57,7 @@ export default function Salespeople() {
 
   return (
     <div>
-      <PageHeader title="Salespeople" description="The people who own visits, follow-ups and deals. Link each one to a login on the Users page." />
+      <PageHeader title="Salespeople" description="The people who own opportunities, follow-ups and opportunities. Link each one to a login on the Users page." />
 
       <div className="flex flex-col gap-5">
         {error && <Notice tone="error" onDismiss={() => setError('')}>{error}</Notice>}

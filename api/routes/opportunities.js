@@ -141,10 +141,10 @@ router.get('/export.xlsx', async (req, res) => {
     const { where, params, order } = dealFilters(req);
     const deals = await db.prepare(`${OPPORTUNITY_SELECT} ${where} ORDER BY ${order} LIMIT 10000`).all(...params);
     const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet('Deals', { views: [{ state: 'frozen', ySplit: 1 }] });
+    const sheet = workbook.addWorksheet('Opportunities', { views: [{ state: 'frozen', ySplit: 1 }] });
     sheet.columns = [
       { header: 'Created date', key: 'created', width: 13, style: { numFmt: 'dd-mmm-yyyy' } },
-      { header: 'Deal', key: 'deal', width: 34 },
+      { header: 'Opportunity', key: 'deal', width: 34 },
       { header: 'Company', key: 'company', width: 30 },
       { header: 'Contact', key: 'contact', width: 22 },
       { header: 'Phone', key: 'phone', width: 16 },
@@ -190,7 +190,7 @@ router.get('/export.xlsx', async (req, res) => {
       });
     }
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename="technicon-deals.xlsx"');
+    res.setHeader('Content-Disposition', 'attachment; filename="technicon-opportunities.xlsx"');
     res.send(Buffer.from(await workbook.xlsx.writeBuffer()));
   } catch (err) {
     sendError(res, err);
@@ -314,7 +314,7 @@ router.post('/bulk', requireCrmWriter, async (req, res) => {
     if ([date, stage, toId].filter(Boolean).length !== 1) throw new HttpError(400, 'Choose one change: a closing date, a stage or a new owner.');
     let reason = null;
     if (toId) {
-      if (!isManaging(req.user)) throw new HttpError(403, 'Only a manager can transfer deals.');
+      if (!isManaging(req.user)) throw new HttpError(403, 'Only a manager can transfer opportunities.');
       reason = requiredText(req.body, 'reason', { max: 500 });
     }
 
@@ -383,7 +383,7 @@ const names = (list) => list.map((item) => item.name).sort().join(', ');
 router.put('/:id', requireCrmWriter, async (req, res) => {
   try {
     const opp = await loadVisibleOpportunity(req.user, Number(req.params.id));
-    if (!isOpen(opp.stage)) throw new HttpError(409, 'Closed deals cannot be edited. Reopen it first.');
+    if (!isOpen(opp.stage)) throw new HttpError(409, 'Closed opportunities cannot be edited. Reopen it first.');
     const currentProducts = opp.products.map((p) => p.id);
     const currentSegments = opp.segments.map((s) => s.id);
     // Changing the OEM clears the products unless new ones were chosen.
@@ -417,7 +417,7 @@ router.put('/:id', requireCrmWriter, async (req, res) => {
 
       const updated = await loadVisibleOpportunity(req.user, opp.id);
       const snapshot = (d) => ({
-        'Deal name': d.title,
+        'Opportunity name': d.title,
         'Order value': d.estimated_value,
         'Expected closing date': d.expected_close_date,
         'Win probability': d.probability,
@@ -459,14 +459,14 @@ router.post('/:id/stage', requireCrmWriter, async (req, res) => {
     const opp = await loadVisibleOpportunity(req.user, Number(req.params.id));
     const stage = oneOf(req.body, 'stage', STAGE_KEYS);
     const note = optionalText(req.body, 'note', { max: 1000 });
-    if (stage === opp.stage) throw new HttpError(409, 'The deal is already at that stage.');
+    if (stage === opp.stage) throw new HttpError(409, 'The opportunity is already at that stage.');
 
     const reopening = !isOpen(opp.stage);
     const closing = CLOSED_STAGES.includes(stage);
-    if (reopening && !isManaging(req.user)) throw new HttpError(403, 'Only a manager can reopen a closed deal.');
-    if (reopening && closing) throw new HttpError(400, 'Reopen the deal to an open stage first.');
+    if (reopening && !isManaging(req.user)) throw new HttpError(403, 'Only a manager can reopen a closed opportunity.');
+    if (reopening && closing) throw new HttpError(400, 'Reopen the opportunity to an open stage first.');
     if (['quotation_sent', 'negotiation'].includes(stage) && opp.quotation_count === 0) {
-      throw new HttpError(400, 'Record the quotation first — the office or a manager adds it on this deal.');
+      throw new HttpError(400, 'Record the quotation first — the office or a manager adds it on this opportunity.');
     }
 
     let wonValue = null;
@@ -479,7 +479,7 @@ router.post('/:id/stage', requireCrmWriter, async (req, res) => {
     if (stage === 'lost') lostReason = oneOf(req.body, 'lost_reason', LOST_REASONS);
     if (closing) {
       closeReason = optionalText(req.body, 'close_reason', { max: 2000 });
-      if (!closeReason) throw new HttpError(400, `Write why the deal is being closed as ${stage}.`);
+      if (!closeReason) throw new HttpError(400, `Write why the opportunity is being closed as ${stage}.`);
     }
     // Won is certain and lost or abandoned is not going to happen. A reopened deal starts over at the
     // default. Any other move keeps the probability the salesperson chose.
@@ -521,9 +521,9 @@ router.post('/:id/stage', requireCrmWriter, async (req, res) => {
 // Move one deal (and its open follow-ups) to another salesperson. Manager action, audited.
 router.post('/:id/owner', requireCrmWriter, async (req, res) => {
   try {
-    if (!isManaging(req.user)) throw new HttpError(403, 'Only a manager can transfer a deal.');
+    if (!isManaging(req.user)) throw new HttpError(403, 'Only a manager can transfer an opportunity.');
     const opp = await loadVisibleOpportunity(req.user, Number(req.params.id));
-    if (!isOpen(opp.stage)) throw new HttpError(409, 'Closed deals keep their owner.');
+    if (!isOpen(opp.stage)) throw new HttpError(409, 'Closed opportunities keep their owner.');
     const toId = optionalId(req.body, 'to_salesperson_id');
     if (!toId) throw new HttpError(400, 'to_salesperson_id is required');
     const reason = requiredText(req.body, 'reason', { max: 500 });
@@ -560,7 +560,7 @@ router.get('/:id/erp-quotations', async (req, res) => {
 router.post('/:id/quotations', requireQuotationRole, async (req, res) => {
   try {
     const opp = await loadVisibleOpportunity(req.user, Number(req.params.id));
-    if (!isOpen(opp.stage)) throw new HttpError(409, 'This deal is closed.');
+    if (!isOpen(opp.stage)) throw new HttpError(409, 'This opportunity is closed.');
     // Picked from the ERP: everything but the document link comes from there.
     const erpId = optionalId(req.body, 'erp_quotation_id');
     let source = 'manual';
@@ -637,7 +637,7 @@ quotationLinksRouter.put('/:id', requireQuotationRole, async (req, res) => {
     });
     res.json(await db.prepare(`SELECT * FROM quotation_link WHERE id = ?`).get(link.id));
   } catch (err) {
-    if (err.code === '23505') return res.status(409).json({ error: 'That quotation number is already recorded on this deal.' });
+    if (err.code === '23505') return res.status(409).json({ error: 'That quotation number is already recorded on this opportunity.' });
     sendError(res, err);
   }
 });

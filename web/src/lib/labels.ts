@@ -112,7 +112,7 @@ export const OUTCOME_NEEDS_FOLLOW_UP: Outcome[] = ['interested', 'follow_up_need
 
 export const TASK_TYPE_LABELS: Record<TaskType, string> = {
   call: 'Call',
-  visit: 'Visit',
+  visit: 'Opportunity',
   demo: 'Product demo',
   technical_discussion: 'Technical discussion',
   send_quotation: 'Send quotation',

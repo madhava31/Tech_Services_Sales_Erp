@@ -43,7 +43,7 @@ const VISIT_SELECT = `
 // Loads a visit the user may see, or throws 404 (never 403, so existence isn't revealed).
 async function loadVisibleVisit(user, id) {
   const visit = await db.prepare(`${VISIT_SELECT} WHERE v.id = ?`).get(id);
-  if (!visit || !canSeeSalesperson(user, visit.salesperson_id)) throw new HttpError(404, 'Visit not found');
+  if (!visit || !canSeeSalesperson(user, visit.salesperson_id)) throw new HttpError(404, 'Opportunity not found');
   return visit;
 }
 
@@ -122,7 +122,7 @@ router.post('/', requireCrmWriter, async (req, res) => {
     const company = await liveCompany(requestedCompanyId);
     if (!company) throw new HttpError(400, 'Company not found.');
     const companyId = company.id;
-    if (company.approval_status === 'rejected') throw new HttpError(409, `${company.name} was rejected, so visits cannot be logged against it.`);
+    if (company.approval_status === 'rejected') throw new HttpError(409, `${company.name} was rejected, so opportunities cannot be logged against it.`);
     const salespersonId = await resolveOwner(req.user, req.body.salesperson_id);
     const visitedAt = optionalTimestamp(req.body, 'visited_at');
     const notes = optionalText(req.body, 'notes', { max: 5000 });
@@ -140,13 +140,13 @@ router.post('/', requireCrmWriter, async (req, res) => {
         action: 'visit.created',
         entityType: 'visit',
         entityId: info.lastInsertRowid,
-        summary: `Started a visit to ${company.name}`,
+        summary: `Started an opportunity to ${company.name}`,
       });
       return info.lastInsertRowid;
     });
     res.status(201).json(await loadVisibleVisit(req.user, id));
   } catch (err) {
-    if (err.code === '23505') return res.status(409).json({ error: err.constraint === 'company_contact_phone_unique' ? 'That phone number already belongs to another contact.' : 'This visit was already submitted.' });
+    if (err.code === '23505') return res.status(409).json({ error: err.constraint === 'company_contact_phone_unique' ? 'That phone number already belongs to another contact.' : 'This opportunity was already submitted.' });
     sendError(res, err);
   }
 });
@@ -154,7 +154,7 @@ router.post('/', requireCrmWriter, async (req, res) => {
 router.put('/:id', requireCrmWriter, async (req, res) => {
   try {
     const visit = await loadVisibleVisit(req.user, Number(req.params.id));
-    if (visit.status !== 'draft') throw new HttpError(409, 'Completed visits cannot be changed.');
+    if (visit.status !== 'draft') throw new HttpError(409, 'Completed opportunities cannot be changed.');
     const notes = req.body.notes !== undefined ? optionalText(req.body, 'notes', { max: 5000 }) : visit.notes;
     const visitedAt = req.body.visited_at !== undefined ? optionalTimestamp(req.body, 'visited_at') ?? visit.visited_at : visit.visited_at;
 
@@ -171,7 +171,7 @@ router.put('/:id', requireCrmWriter, async (req, res) => {
         action: 'visit.updated',
         entityType: 'visit',
         entityId: visit.id,
-        summary: `Updated the unfinished visit to ${visit.company_name}`,
+        summary: `Updated the unfinished opportunity to ${visit.company_name}`,
         before: { contact_id: visit.contact_id, notes: visit.notes },
         after: { contact_id: contactId, notes },
       });
@@ -185,7 +185,7 @@ router.put('/:id', requireCrmWriter, async (req, res) => {
 router.post('/:id/complete', requireCrmWriter, async (req, res) => {
   try {
     const visit = await loadVisibleVisit(req.user, Number(req.params.id));
-    if (visit.status !== 'draft') throw new HttpError(409, 'This visit is already completed.');
+    if (visit.status !== 'draft') throw new HttpError(409, 'This opportunity is already completed.');
     const outcome = oneOf(req.body, 'outcome', OUTCOMES);
     const notes = req.body.notes !== undefined ? optionalText(req.body, 'notes', { max: 5000 }) : visit.notes;
     const requirements = parseRequirementList(req.body.requirements);
@@ -207,7 +207,7 @@ router.post('/:id/complete', requireCrmWriter, async (req, res) => {
         .prepare(`UPDATE visit SET status = 'completed', outcome = ?, notes = ?, completed_at = NOW(), updated_at = NOW() WHERE id = ? AND status = 'draft'`)
         .run(outcome, notes, visit.id);
       // Lost a race with another completion of the same draft.
-      if (done.changes !== 1) throw new HttpError(409, 'This visit is already completed.');
+      if (done.changes !== 1) throw new HttpError(409, 'This opportunity is already completed.');
       const opportunityId = await applyDealLink(dealLink, visit, outcome, req.user.id);
       for (const fields of requirements) {
         await insertRequirement({ companyId: visit.company_id, visitId: visit.id, opportunityId, salespersonId: visit.salesperson_id, userId: req.user.id, fields });
@@ -251,11 +251,11 @@ async function parseDealLink(req, visit, outcome) {
   const id = optionalId(body, 'id');
   if (id) {
     const opp = await loadVisibleOpportunity(req.user, id).catch(() => null);
-    if (!opp || opp.company_id !== visit.company_id) throw new HttpError(400, 'That deal is not one of this company’s.');
-    if (!isOpen(opp.stage)) throw new HttpError(400, 'That deal is closed.');
+    if (!opp || opp.company_id !== visit.company_id) throw new HttpError(400, 'That opportunity is not one of this company’s.');
+    if (!isOpen(opp.stage)) throw new HttpError(400, 'That opportunity is closed.');
     return { existing: opp };
   }
-  if (!OUTCOME_STAGE[outcome]) throw new HttpError(400, 'Open a deal only when the customer has a real need.');
+  if (!OUTCOME_STAGE[outcome]) throw new HttpError(400, 'Open an opportunity only when the customer has a real need.');
   const company = await assertCompanyAcceptsDeals(visit.company_id);
   return { companyName: company.name, create: await parseDealFields(body, { companyId: visit.company_id }) };
 }
@@ -267,7 +267,7 @@ async function applyDealLink(link, visit, outcome, userId) {
   let opportunityId;
   if (link.existing) {
     opportunityId = link.existing.id;
-    if (target) await advanceIfBehind({ opportunity: link.existing, stage: target, userId, note: `Visit on ${new Date(visit.visited_at).toISOString().slice(0, 10)}` });
+    if (target) await advanceIfBehind({ opportunity: link.existing, stage: target, userId, note: `Opportunity on ${new Date(visit.visited_at).toISOString().slice(0, 10)}` });
   } else {
     opportunityId = await insertOpportunity({
       companyId: visit.company_id,

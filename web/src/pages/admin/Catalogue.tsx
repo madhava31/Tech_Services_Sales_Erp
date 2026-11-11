@@ -128,7 +128,7 @@ function StuckLimits() {
 
   return (
     <Card>
-      <CardHeader title="When a deal counts as stuck" description="Days a deal can stay in a stage before it is flagged. Set these to how long your deals really take." />
+      <CardHeader title="When an opportunity counts as stuck" description="Days an opportunity can stay in a stage before it is flagged. Set these to how long your opportunities really take." />
       {error && (
         <div className="px-4 sm:px-5 pt-3">
           <Notice tone="error" onDismiss={() => setError('')}>{error}</Notice>
@@ -172,9 +172,9 @@ function StuckLimits() {
 export default function Catalogue() {
   return (
     <div className="max-w-3xl flex flex-col gap-5">
-      <PageHeader title="OEMs, segments and stuck limits" description="The choices offered on every deal, and when a deal is flagged as stuck." />
+      <PageHeader title="OEMs, segments and stuck limits" description="The choices offered on every opportunity, and when an opportunity is flagged as stuck." />
       <NameList title="OEMs" description="The makes we sell." load={() => api.catalogue.oems(true)} create={api.catalogue.createOem} update={api.catalogue.updateOem} />
-      <NameList title="Market segments" description="Who the deal is for." load={() => api.catalogue.segments(true)} create={api.catalogue.createSegment} update={api.catalogue.updateSegment} />
+      <NameList title="Market segments" description="Who the opportunity is for." load={() => api.catalogue.segments(true)} create={api.catalogue.createSegment} update={api.catalogue.updateSegment} />
       <StuckLimits />
     </div>
   );

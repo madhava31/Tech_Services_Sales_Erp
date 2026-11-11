@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { api, CompanySummary, DealFilters, NamedOption, Opportunity, Stage } from '../../lib/api';
+import { Link } from 'react-router-dom';
+import { api, DealFilters, NamedOption, Opportunity, Stage } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { LOST_REASON_LABELS, OPEN_STAGES, STAGE_LABELS, formatDate, formatMoney } from '../../lib/labels';
 import { canWriteCrm, isManagingRole } from '../../lib/roles';
 import BulkBar, { bulkMessage } from '../../components/BulkBar';
-import CompanyPicker from '../../components/CompanyPicker';
-import DealFields, { DealDraft, EMPTY_DEAL_DRAFT, dealDraftComplete, draftToInput } from '../../components/DealFields';
-import { Badge, Button, Card, CardHeader, EmptyState, Notice, OverdueBadge, PHONE_TOUCH, PageHeader, SelectField, SkeletonRows, StuckBadge, TextField, stagger } from '../../components/ui';
+import { Badge, Button, Card, EmptyState, Notice, OverdueBadge, PHONE_TOUCH, PageHeader, SelectField, SkeletonRows, StuckBadge, TextField, stagger } from '../../components/ui';
 
 type View = 'open' | 'won' | 'lost' | 'abandoned';
 
@@ -53,7 +51,6 @@ export default function Pipeline() {
   const [deals, setDeals] = useState<Opportunity[] | null>(null);
   const [error, setError] = useState('');
   const [stageFilter, setStageFilter] = useState<Stage | ''>('');
-  const [creating, setCreating] = useState(false);
   const teamView = user?.role !== 'salesperson';
   const [overdueOnly, setOverdueOnly] = useState(false);
   const [stuckOnly, setStuckOnly] = useState(false);
@@ -133,12 +130,17 @@ export default function Pipeline() {
     <div className="flex flex-col gap-4">
       <PageHeader
         title="Pipeline"
-        description={teamView ? 'Every open deal across the team.' : 'Your deals.'}
-        actions={canWriteCrm(user?.role) && !creating && <Button onClick={() => setCreating(true)}>+ New deal</Button>}
+        description={teamView ? 'Every open opportunity across the team.' : 'Your opportunities.'}
+        actions={
+          canWriteCrm(user?.role) && (
+            <Link to="/opportunities/new" className="ts-btn ts-dark justify-center max-[860px]:min-h-11">
+              + New opportunity
+            </Link>
+          )
+        }
       />
       {error && <Notice tone="error" onDismiss={() => setError('')}>{error}</Notice>}
       {notice && <Notice tone="success" onDismiss={() => setNotice('')}>{notice}</Notice>}
-      {creating && <NewDeal onCancel={() => setCreating(false)} />}
 
       <div className="ts-toolbar !mb-0">
         <div className="ts-tabs" role="tablist">
@@ -177,7 +179,7 @@ export default function Pipeline() {
         )}
         {view === 'open' && deals && (
           <span className="ts-muted text-[13.5px] ml-auto">
-            {deals.length} deals · {formatMoney(openTotal, { compact: true })} · weighted {formatMoney(weighted, { compact: true })}
+            {deals.length} opportunities · {formatMoney(openTotal, { compact: true })} · weighted {formatMoney(weighted, { compact: true })}
           </span>
         )}
       </div>
@@ -255,7 +257,7 @@ export default function Pipeline() {
             ))}
             {deals.length === 0 && (
               <Card>
-                <EmptyState>No open deals. Open one from a visit or with “New deal”.</EmptyState>
+                <EmptyState>No open opportunities. Open one from an opportunity or with “New opportunity”.</EmptyState>
               </Card>
             )}
           </div>
@@ -272,7 +274,7 @@ export default function Pipeline() {
                     <b>{formatMoney(total(list), { compact: true })}</b>
                   </header>
                   <div className="ts-kcards">
-                    {list.length === 0 && <div className="ts-kempty">No deals</div>}
+                    {list.length === 0 && <div className="ts-kempty">No opportunities</div>}
                     {list.map((d) => (
                       <DealCard key={d.id} deal={d} teamView={teamView} {...cardProps(d)} />
                     ))}
@@ -359,70 +361,5 @@ export default function Pipeline() {
         </Card>
       )}
     </div>
-  );
-}
-
-function NewDeal({ onCancel }: { onCancel: () => void }) {
-  const navigate = useNavigate();
-  const [company, setCompany] = useState<CompanySummary | null>(null);
-  const [form, setForm] = useState<DealDraft>(EMPTY_DEAL_DRAFT);
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!company) return;
-    setBusy(true);
-    setError('');
-    try {
-      const deal = await api.opportunities.create({ company_id: company.id, ...draftToInput(form) });
-      navigate(`/pipeline/${deal.id}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not open the deal.');
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Card>
-      <CardHeader title="New deal" />
-      <div className="p-4 sm:p-5 flex flex-col gap-4">
-        {error && <Notice tone="error">{error}</Notice>}
-        {!company ? (
-          <CompanyPicker onSelect={setCompany} allowCreate />
-        ) : (
-          <form onSubmit={submit} className="flex flex-col gap-4">
-            <div className="ts-box !py-2 flex items-center justify-between">
-              <span className="text-sm font-medium">{company.name}</span>
-              <Button size="sm" variant="ghost" onClick={() => setCompany(null)}>
-                Change
-              </Button>
-            </div>
-            {company.approval_status !== 'approved' ? (
-              <Notice tone="error">
-                {company.name} is waiting for a manager’s approval. You can log visits against it now; a deal can be opened once it is approved.
-              </Notice>
-            ) : (
-              <DealFields companyId={company.id} value={form} onChange={(patch) => setForm({ ...form, ...patch })} />
-            )}
-            <div className="flex gap-2">
-              <Button type="submit" disabled={busy || company.approval_status !== 'approved' || !dealDraftComplete(form)}>
-                Open deal
-              </Button>
-              <Button variant="ghost" onClick={onCancel}>
-                Cancel
-              </Button>
-            </div>
-          </form>
-        )}
-        {!company && (
-          <div>
-            <Button variant="ghost" onClick={onCancel}>
-              Cancel
-            </Button>
-          </div>
-        )}
-      </div>
-    </Card>
   );
 }

@@ -113,7 +113,7 @@ async function drain() {
       const id = visitIds[local[1]];
       if (!id) {
         item.status = 'conflict';
-        item.error = 'Waiting for the visit it belongs to.';
+        item.error = 'Waiting for the opportunity it belongs to.';
         await outboxPut(item);
         continue;
       }

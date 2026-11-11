@@ -157,7 +157,7 @@ async function setActive(req, res, active) {
         .get(id, id, id, id);
       if (open.deals || open.tasks || open.accounts) {
         return res.status(409).json({
-          error: `${existing.name} still has ${open.deals} open deal(s), ${open.tasks} open follow-up(s) and ${open.accounts} instrument(s) or reorder(s). Hand them over first.`,
+          error: `${existing.name} still has ${open.deals} open opportunities, ${open.tasks} open follow-up(s) and ${open.accounts} instrument(s) or reorder(s). Hand them over first.`,
           open_deals: open.deals,
           open_tasks: open.tasks,
         });

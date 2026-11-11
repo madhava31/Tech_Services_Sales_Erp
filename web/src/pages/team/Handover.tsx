@@ -64,11 +64,11 @@ export default function Handover() {
 
   return (
     <div className="max-w-3xl flex flex-col gap-4">
-      <PageHeader title="Hand over work" description="Move open deals and follow-ups to another salesperson. Closed deals, visits and history stay with the original salesperson." />
+      <PageHeader title="Hand over work" description="Move open opportunities and follow-ups to another salesperson. Closed opportunities, opportunities and history stay with the original salesperson." />
       {error && <Notice tone="error" onDismiss={() => setError('')}>{error}</Notice>}
       {done && (
         <Notice tone="success" onDismiss={() => setDone(null)}>
-          Moved {done.deals_moved} deal(s), {done.follow_ups_moved} follow-up(s), {done.instruments_moved} instrument(s) and {done.reorders_moved} reorder(s) from {done.from} to {done.to}. Recorded in each deal’s history and the audit log.
+          Moved {done.deals_moved} opportunities, {done.follow_ups_moved} follow-up(s), {done.instruments_moved} instrument(s) and {done.reorders_moved} reorder(s) from {done.from} to {done.to}. Recorded in each opportunity’s history and the audit log.
         </Notice>
       )}
 
@@ -105,12 +105,12 @@ export default function Handover() {
               )}
               {preview.draft_visits > 0 && (
                 <p className="text-xs text-ink-muted">
-                  {preview.draft_visits} unfinished visit(s) stay with {preview.salesperson.name}; a manager can complete them from Visits.
+                  {preview.draft_visits} unfinished opportunities stay with {preview.salesperson.name}; a manager can complete them from Opportunities.
                 </p>
               )}
               <Card>
                 <CardHeader
-                  title={`Open deals (${preview.deals.length})`}
+                  title={`Open opportunities (${preview.deals.length})`}
                   action={
                     preview.deals.length > 0 ? (
                       <Button size="sm" variant="ghost" onClick={() => setSelected(selected.size === preview.deals.length ? new Set() : new Set(preview.deals.map((d) => d.id)))}>
@@ -119,7 +119,7 @@ export default function Handover() {
                     ) : undefined
                   }
                 />
-                {preview.deals.length === 0 && <EmptyState>No open deals.</EmptyState>}
+                {preview.deals.length === 0 && <EmptyState>No open opportunities.</EmptyState>}
                 <ul className="divide-y divide-dashed divide-line overflow-hidden rounded-b-card max-h-96 overflow-y-auto">
                   {preview.deals.map((d) => (
                     <li key={d.id} className="px-4 py-2.5">
@@ -156,13 +156,13 @@ export default function Handover() {
               {preview.loose_tasks + preview.instruments + preview.reorders > 0 && (
                 <label className="flex items-center gap-2 text-sm">
                   <input type="checkbox" className="ts-chk shrink-0" checked={includeLoose} onChange={(e) => setIncludeLoose(e.target.checked)} />
-                  Also move {preview.loose_tasks} follow-up(s) not attached to a deal, {preview.instruments} instrument(s) and {preview.reorders} reorder(s)
+                  Also move {preview.loose_tasks} follow-up(s) not attached to an opportunity, {preview.instruments} instrument(s) and {preview.reorders} reorder(s)
                 </label>
               )}
               <TextField label="Reason" placeholder="e.g. Resigned — handing over Hyderabad accounts" value={reason} onChange={(e) => setReason(e.target.value)} required />
               <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                 <Button type="submit" disabled={busy || !toId || !reason.trim() || nothing}>
-                  {busy ? 'Moving…' : `Move ${selected.size} deal${selected.size === 1 ? '' : 's'} and ${followUps} follow-up${followUps === 1 ? '' : 's'}`}
+                  {busy ? 'Moving…' : `Move ${selected.size} ${selected.size === 1 ? 'opportunity' : 'opportunities'} and ${followUps} follow-up${followUps === 1 ? '' : 's'}`}
                 </Button>
                 <span className="text-sm text-ink-muted">{formatMoney(total, { compact: true })} of pipeline</span>
               </div>
@@ -172,7 +172,7 @@ export default function Handover() {
       </Card>
 
       <p className="text-xs text-subtle">
-        To move a single deal, open it in the <Link to="/pipeline" className="underline">pipeline</Link> and use “Transfer”.
+        To move a single opportunity, open it in the <Link to="/pipeline" className="underline">pipeline</Link> and use “Transfer”.
       </p>
     </div>
   );

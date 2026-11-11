@@ -174,7 +174,8 @@ export function rowStagger(i: number) {
 
 // Lists are tables on desktop; phones keep rows that don't need sideways scrolling.
 export const DESKTOP_ONLY = 'max-[860px]:hidden';
-export const PHONE_ONLY = 'min-[861px]:hidden';
+// .ts-list sets its own display, so hiding it needs the important form.
+export const PHONE_ONLY = 'min-[861px]:!hidden';
 
 // A figure on a page: label, value, optional note. Numbers count up unless `still` is set, as on printed reports.
 export function Tile({ label, value, hint, tone, i, still, className }: { label: string; value: string | number; hint?: string; tone?: 'ok' | 'danger' | 'warn'; i?: number; still?: boolean; className?: string }) {

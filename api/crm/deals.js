@@ -20,8 +20,8 @@ export async function assertCompanyAcceptsDeals(companyId) {
     throw new HttpError(
       409,
       company.approval_status === 'pending'
-        ? `${company.name} is waiting for approval. A deal can be opened once a manager approves it.`
-        : `${company.name} was rejected, so a deal cannot be opened on it.`
+        ? `${company.name} is waiting for approval. An opportunity can be opened once a manager approves it.`
+        : `${company.name} was rejected, so an opportunity cannot be opened on it.`
     );
   }
   return company;
@@ -134,7 +134,7 @@ export async function insertOpportunity({ companyId, companyName, ownerId, stage
     action: 'opportunity.created',
     entityType: 'opportunity',
     entityId: id,
-    summary: `Opened deal "${fields.title}" with ${companyName}`,
+    summary: `Opened opportunity "${fields.title}" with ${companyName}`,
     after: { ...fields, new_contact: undefined, contact_id: contactId },
   });
   return id;

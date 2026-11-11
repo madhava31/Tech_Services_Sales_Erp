@@ -72,8 +72,8 @@ export default function Team() {
 
       {insights && insights.orphaned.length > 0 && (
         <Notice tone="error">
-          {insights.orphaned.map((o) => `${o.name} (${o.open_deals} open deal${o.open_deals === 1 ? '' : 's'})`).join(', ')}{' '}
-          {insights.orphaned.length === 1 ? 'has' : 'have'} left but still own{insights.orphaned.length === 1 ? 's' : ''} open deals.{' '}
+          {insights.orphaned.map((o) => `${o.name} (${o.open_deals} open ${o.open_deals === 1 ? 'opportunity' : 'opportunities'})`).join(', ')}{' '}
+          {insights.orphaned.length === 1 ? 'has' : 'have'} left but still own{insights.orphaned.length === 1 ? 's' : ''} open opportunities.{' '}
           {isManagingRole(user?.role) && (
             <Link to={`/team/handover?from=${insights.orphaned[0].salesperson_id}`} className="underline font-medium">
               Hand them over
@@ -86,11 +86,11 @@ export default function Team() {
 
       {t && (
         <div className="ts-grid grid-cols-2 min-[1101px]:grid-cols-6">
-          <Tile i={0} label="Won" value={formatMoney(t.won_value, { compact: true })} hint={`${t.deals_won} deals · ${t.deals_lost} lost · ${t.deals_abandoned} abandoned`} tone="ok" />
+          <Tile i={0} label="Won" value={formatMoney(t.won_value, { compact: true })} hint={`${t.deals_won} opportunities · ${t.deals_lost} lost · ${t.deals_abandoned} abandoned`} tone="ok" />
           <Tile i={1} label="Pipeline" value={formatMoney(t.pipeline_value, { compact: true })} hint={`${t.open_deals} open · weighted ${formatMoney(t.weighted_pipeline, { compact: true })}`} />
-          <Tile i={2} label="Visits" value={t.visits} hint={`${t.companies_visited} companies · ${t.new_prospects} new`} />
-          <Tile i={3} label="Overdue deals" value={t.overdue_deals} tone={t.overdue_deals ? 'danger' : undefined} hint="Past expected closing date" />
-          <Tile i={4} label="Stuck deals" value={t.stuck_deals} tone={t.stuck_deals ? 'warn' : undefined} hint="Too long in one stage" />
+          <Tile i={2} label="Opportunities" value={t.visits} hint={`${t.companies_visited} companies · ${t.new_prospects} new`} />
+          <Tile i={3} label="Overdue opportunities" value={t.overdue_deals} tone={t.overdue_deals ? 'danger' : undefined} hint="Past expected closing date" />
+          <Tile i={4} label="Stuck opportunities" value={t.stuck_deals} tone={t.stuck_deals ? 'warn' : undefined} hint="Too long in one stage" />
           <Tile i={5} label="Overdue follow-ups" value={t.overdue_follow_ups} tone={t.overdue_follow_ups ? 'danger' : undefined} hint="Right now" />
         </div>
       )}
@@ -108,7 +108,7 @@ export default function Team() {
                 </div>
                 <div className="grid grid-cols-3 gap-2 mt-2 text-xs text-ink-muted">
                   <span>
-                    <b className="text-ink">{p.metrics.visits}</b> visits
+                    <b className="text-ink">{p.metrics.visits}</b> {p.metrics.visits === 1 ? 'opportunity' : 'opportunities'}
                   </span>
                   <span>
                     <b className="text-ink">{p.metrics.deals_won}</b> won · {formatMoney(p.metrics.won_value, { compact: true })}
@@ -131,7 +131,7 @@ export default function Team() {
                   <span>
                     <b className="text-ink">{p.metrics.deals_lost}</b> lost · <b className="text-ink">{p.metrics.deals_abandoned}</b> aband.
                   </span>
-                  <span className={p.metrics.overdue_deals ? 'text-danger font-medium' : ''}>{p.metrics.overdue_deals} deals overdue</span>
+                  <span className={p.metrics.overdue_deals ? 'text-danger font-medium' : ''}>{p.metrics.overdue_deals} opportunities overdue</span>
                   <span className={p.metrics.stuck_deals ? 'text-warn font-medium' : ''}>{p.metrics.stuck_deals} stuck</span>
                   <span className={p.metrics.overdue_follow_ups ? 'text-danger font-medium' : ''}>{p.metrics.overdue_follow_ups} follow-ups overdue</span>
                 </div>
@@ -144,7 +144,7 @@ export default function Team() {
               <thead>
                 <tr>
                   <th>Salesperson</th>
-                  {['Visits', 'Open', 'Pipeline', 'Weighted', 'Overdue deals', 'Stuck', 'Won', 'Won value', 'Lost', 'Abandoned', 'Quote req.', 'Overdue tasks'].map((h) => (
+                  {['Opportunities', 'Open', 'Pipeline', 'Weighted', 'Overdue opportunities', 'Stuck', 'Won', 'Won value', 'Lost', 'Abandoned', 'Quote req.', 'Overdue tasks'].map((h) => (
                     <th key={h} className="ts-r">
                       {h}
                     </th>
@@ -202,7 +202,7 @@ export default function Team() {
             <CardHeader title="Won, last 6 months" />
             <div className="px-4 sm:px-5 py-4 grid grid-cols-6 gap-2 items-end h-56" role="list">
               {insights.won_by_month.map((m, i) => (
-                <div key={m.month} className={`ts-col !flex-col !items-center gap-1.5 !cursor-default ${i === insights.won_by_month.length - 1 ? 'ts-on' : ''}`} role="listitem" aria-label={`${monthLabel(m.month)}: ${formatMoney(m.won_value)}, ${m.deals_won} deals`}>
+                <div key={m.month} className={`ts-col !flex-col !items-center gap-1.5 !cursor-default ${i === insights.won_by_month.length - 1 ? 'ts-on' : ''}`} role="listitem" aria-label={`${monthLabel(m.month)}: ${formatMoney(m.won_value)}, ${m.deals_won} opportunities`}>
                   <span className="text-[11px] text-ink-muted tabular-nums">{m.won_value ? formatMoney(m.won_value, { compact: true }) : ''}</span>
                   <div className="ts-bar" style={{ height: `${Math.max(3, (m.won_value / maxMonth) * 80)}%` }} />
                   <span className="text-xs text-ink-muted">{monthLabel(m.month)}</span>
@@ -219,7 +219,7 @@ export default function Team() {
               { title: 'By market segment', rows: insights.by_segment.map((r) => ({ key: r.segment, ...r })) },
             ].map((section, i) => (
               <Card key={section.title} style={stagger(i)}>
-                <CardHeader title={section.title} description={section.title === 'By market segment' ? 'A deal in two segments counts in both.' : 'Won in the period · open pipeline now'} />
+                <CardHeader title={section.title} description={section.title === 'By market segment' ? 'An opportunity in two segments counts in both.' : 'Won in the period · open pipeline now'} />
                 {section.rows.length === 0 && <EmptyState>Nothing yet.</EmptyState>}
                 <ul className="divide-y divide-dashed divide-line overflow-hidden rounded-b-card">
                   {section.rows.map((r) => (
@@ -239,8 +239,8 @@ export default function Team() {
           </div>
 
           <Card>
-            <CardHeader title="Deals going quiet" description={`Open deals with no activity for ${insights.stale_after_days}+ days, biggest first.`} />
-            {insights.stale_deals.length === 0 && <EmptyState>Every open deal has had recent activity.</EmptyState>}
+            <CardHeader title="Opportunities going quiet" description={`Open opportunities with no activity for ${insights.stale_after_days}+ days, biggest first.`} />
+            {insights.stale_deals.length === 0 && <EmptyState>Every open opportunity has had recent activity.</EmptyState>}
             <ul className="divide-y divide-dashed divide-line overflow-hidden rounded-b-card">
               {insights.stale_deals.map((d) => (
                 <li key={d.id}>
@@ -263,7 +263,7 @@ export default function Team() {
 
           {t && t.lost_reasons.length > 0 && (
             <Card>
-              <CardHeader title="Why deals were lost" />
+              <CardHeader title="Why opportunities were lost" />
               <div className="px-4 sm:px-5 py-3">
                 {t.lost_reasons.map((r) => (
                   <div key={r.reason} className="ts-hbar">

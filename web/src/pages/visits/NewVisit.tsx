@@ -15,7 +15,7 @@ export default function NewVisit() {
   const [params] = useSearchParams();
   const [company, setCompany] = useState<CompanyDetail | null>(null);
   const [contactChoice, setContactChoice] = useState<string>('');
-  const [newContact, setNewContact] = useState({ name: '', designation: '', phone: '' });
+  const [newContact, setNewContact] = useState({ name: '', designation: '', department: '', phone: '' });
   const [salespeople, setSalespeople] = useState<{ id: number; name: string }[]>([]);
   const [salespersonId, setSalespersonId] = useState<number | ''>(user?.salesperson_id ?? '');
   const [error, setError] = useState('');
@@ -77,14 +77,14 @@ export default function NewVisit() {
       );
       navigate(result.queued ? `/visits/local/${clientUuid}` : `/visits/${result.data.id}`, { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not start the visit.');
+      setError(err instanceof Error ? err.message : 'Could not start the opportunity.');
       setBusy(false);
     }
   }
 
   return (
     <div className="max-w-3xl">
-      <PageHeader title="Log a visit" description="Start it when you arrive; finish it with the outcome after the meeting." />
+      <PageHeader title="Log an opportunity" description="Start it when you arrive; finish it with the outcome after the meeting." />
       {error && <div className="mb-4"><Notice tone="error">{error}</Notice></div>}
 
       {!company ? (
@@ -115,9 +115,10 @@ export default function NewVisit() {
             </SelectField>
 
             {contactChoice === 'new' && (
-              <div className="ts-fgrid ts-g3 !mt-0">
+              <div className="ts-fgrid ts-g2 !mt-0">
                 <TextField label="Name" value={newContact.name} onChange={(e) => setNewContact({ ...newContact, name: e.target.value })} autoFocus />
                 <TextField label="Designation" value={newContact.designation} onChange={(e) => setNewContact({ ...newContact, designation: e.target.value })} />
+                <TextField label="Department" value={newContact.department} onChange={(e) => setNewContact({ ...newContact, department: e.target.value })} />
                 <TextField label="Phone" type="tel" inputMode="tel" value={newContact.phone} onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })} />
               </div>
             )}
@@ -127,7 +128,7 @@ export default function NewVisit() {
                 label="Salesperson"
                 value={salespersonId}
                 onChange={(e) => setSalespersonId(e.target.value ? Number(e.target.value) : '')}
-                hint="Whose visit is this?"
+                hint="Whose opportunity is this?"
               >
                 <option value="">Select…</option>
                 {salespeople.map((s) => (
@@ -139,7 +140,7 @@ export default function NewVisit() {
             )}
 
             <Button type="submit" disabled={busy || (managing && !salespersonId) || (contactChoice === 'new' && !newContact.name.trim())} className="h-12">
-              {busy ? 'Starting…' : 'Start visit'}
+              {busy ? 'Starting…' : 'Start opportunity'}
             </Button>
           </form>
         </Card>

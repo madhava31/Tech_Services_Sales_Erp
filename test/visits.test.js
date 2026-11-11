@@ -54,9 +54,9 @@ test('the same client_uuid never creates a second visit', async () => {
 
 test('visits are private to their salesperson; managers see everyone', async () => {
   const visit = await startVisit(ravi.client);
-  assert.equal((await priya.client.request('GET', `/api/visits/${visit.id}`)).body.error, 'Visit not found');
-  assert.equal((await priya.client.request('PUT', `/api/visits/${visit.id}`, { notes: 'x' })).body.error, 'Visit not found');
-  assert.equal((await priya.client.request('POST', `/api/visits/${visit.id}/complete`, { outcome: 'not_interested' })).body.error, 'Visit not found');
+  assert.equal((await priya.client.request('GET', `/api/visits/${visit.id}`)).body.error, 'Opportunity not found');
+  assert.equal((await priya.client.request('PUT', `/api/visits/${visit.id}`, { notes: 'x' })).body.error, 'Opportunity not found');
+  assert.equal((await priya.client.request('POST', `/api/visits/${visit.id}/complete`, { outcome: 'not_interested' })).body.error, 'Opportunity not found');
   const priyaList = await priya.client.request('GET', '/api/visits');
   assert.ok(priyaList.body.every((v) => v.salesperson_id === priya.salespersonId));
   assert.equal((await manager.request('GET', `/api/visits/${visit.id}`)).status, 200);

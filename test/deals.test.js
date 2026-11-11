@@ -224,7 +224,7 @@ test('quotation requests: the queue, recording a quotation with a link, and safe
 async function readSheet(res) {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(res.buffer);
-  const sheet = workbook.getWorksheet('Deals');
+  const sheet = workbook.getWorksheet('Opportunities');
   const header = sheet.getRow(1).values.slice(1);
   const rows = [];
   sheet.eachRow((row, n) => {
@@ -245,18 +245,18 @@ test('Excel export: the agreed columns, current filters, and only your own deals
   assert.match(res.headers.get('content-type'), /spreadsheetml/);
   const { header, rows } = await readSheet(res);
   assert.deepEqual(header, [
-    'Created date', 'Deal', 'Company', 'Contact', 'Phone', 'Salesperson', 'OEM', 'Products', 'Stage', 'Expected closing date', 'Win probability %',
+    'Created date', 'Opportunity', 'Company', 'Contact', 'Phone', 'Salesperson', 'OEM', 'Products', 'Stage', 'Expected closing date', 'Win probability %',
     'Probability reason', 'Order value (INR)', 'Weighted value', 'Tender', 'Market segment', 'Outcome', 'Overdue', 'Close reason / comments',
   ]);
   assert.equal(rows.length, 1, 'filters apply');
-  assert.equal(rows[0].Deal, 'Overdue export');
+  assert.equal(rows[0].Opportunity, 'Overdue export');
   assert.equal(rows[0].Contact, 'Ms. Iyer');
   assert.equal(rows[0].Phone, '9000044444');
   assert.equal(rows[0]['Weighted value'], 500000);
   assert.equal(rows[0].Overdue, 'Yes');
 
   const own = await readSheet(await rep.client.requestRaw('GET', '/api/opportunities/export.xlsx'));
-  assert.equal(own.rows.some((r) => r.Deal === others.title), false, 'a salesperson gets only their own deals');
+  assert.equal(own.rows.some((r) => r.Opportunity === others.title), false, 'a salesperson gets only their own deals');
   const all = await readSheet(await office.requestRaw('GET', '/api/opportunities/export.xlsx?limit=1'));
-  assert.ok(all.rows.some((r) => r.Deal === others.title), 'office staff get everyone’s');
+  assert.ok(all.rows.some((r) => r.Opportunity === others.title), 'office staff get everyone’s');
 });

@@ -30,11 +30,11 @@ function FunnelChart({ funnel }: { funnel: Funnel }) {
   const steps = funnel.stages.filter((s) => s.to_next_pct !== null && s.reached >= 3);
   const weakest = steps.length ? steps.reduce((a, b) => ((b.to_next_pct ?? 100) < (a.to_next_pct ?? 100) ? b : a)) : null;
 
-  if (funnel.total === 0) return <EmptyState>No deals opened in this period.</EmptyState>;
+  if (funnel.total === 0) return <EmptyState>No opportunities opened in this period.</EmptyState>;
   return (
     <div className="px-4 sm:px-5 py-4 flex flex-col gap-4">
       <p className="text-sm">
-        Of <b>{funnel.total}</b> deals opened, <b>{won.reached}</b> {won.reached === 1 ? 'was' : 'were'} won ({Math.round((won.reached / top) * 100)}%), {funnel.lost_or_abandoned} lost or abandoned, and {funnel.total - won.reached - funnel.lost_or_abandoned} still open.
+        Of <b>{funnel.total}</b> opportunities opened, <b>{won.reached}</b> {won.reached === 1 ? 'was' : 'were'} won ({Math.round((won.reached / top) * 100)}%), {funnel.lost_or_abandoned} lost or abandoned, and {funnel.total - won.reached - funnel.lost_or_abandoned} still open.
         {weakest && weakest.to_next_pct! < 100 && (
           <>
             {' '}
@@ -52,7 +52,7 @@ function FunnelChart({ funnel }: { funnel: Funnel }) {
                 <span className="text-ink-muted"> · {formatMoney(s.reached_value, { compact: true })}</span>
               </span>
             </div>
-            <div className="mt-1.5 h-2.5 rounded-full bg-tile overflow-hidden" title={`${STAGE_LABELS[s.stage]}: ${s.reached} deals, ${formatMoney(s.reached_value)}`}>
+            <div className="mt-1.5 h-2.5 rounded-full bg-tile overflow-hidden" title={`${STAGE_LABELS[s.stage]}: ${s.reached} opportunities, ${formatMoney(s.reached_value)}`}>
               <div className={`h-full rounded-full ${s.stage === 'won' ? 'bg-cta' : 'bg-brand'}`} style={{ width: `${s.reached ? Math.max(1.5, (s.reached / top) * 100) : 0}%` }} />
             </div>
             <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-ink-muted">
@@ -66,7 +66,7 @@ function FunnelChart({ funnel }: { funnel: Funnel }) {
           </li>
         ))}
       </ol>
-      <p className="text-xs text-subtle">A deal that skipped a stage counts as having passed it. Deals opened recently may still move on, so later stages read low over short periods.</p>
+      <p className="text-xs text-subtle">An opportunity that skipped a stage counts as having passed it. Opportunities opened recently may still move on, so later stages read low over short periods.</p>
     </div>
   );
 }
@@ -129,7 +129,7 @@ function ForecastRow({ label, bucket, max, won, teamView, overdue }: { label: st
             <ForecastBar bucket={bucket} max={max} />
           </div>
           <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-ink-muted">
-            {bucket.count > 0 ? <span>{bucket.count} deal{bucket.count === 1 ? '' : 's'} · tap to see them</span> : <span>Nothing expected</span>}
+            {bucket.count > 0 ? <span>{bucket.count} {bucket.count === 1 ? 'opportunity' : 'opportunities'} · tap to see them</span> : <span>Nothing expected</span>}
             {bucket.commit > 0 && <span>Commit {formatMoney(bucket.commit, { compact: true })}</span>}
             {bucket.best_case > 0 && <span>Best case {formatMoney(bucket.best_case, { compact: true })}</span>}
             {bucket.pipeline > 0 && <span>Pipeline {formatMoney(bucket.pipeline, { compact: true })}</span>}
@@ -167,7 +167,7 @@ function ForecastChart({ forecast, teamView }: { forecast: Forecast; teamView: b
         {forecast.later.count > 0 && <ForecastRow label="Later" bucket={forecast.later} max={max} teamView={teamView} />}
         {forecast.no_date.count > 0 && <ForecastRow label="No closing date" bucket={forecast.no_date} max={max} teamView={teamView} />}
       </ul>
-      <p className="px-4 sm:px-5 pb-3 text-xs text-subtle">From each open deal’s expected closing date and win probability. Weighted = order value × win probability.</p>
+      <p className="px-4 sm:px-5 pb-3 text-xs text-subtle">From each open opportunity’s expected closing date and win probability. Weighted = order value × win probability.</p>
     </>
   );
 }
@@ -201,7 +201,7 @@ export default function Analysis() {
 
   return (
     <div>
-      <PageHeader title="Sales analysis" description={teamView ? 'Where deals drop out, and what should close when.' : 'Your funnel and what you expect to close.'} />
+      <PageHeader title="Sales analysis" description={teamView ? 'Where opportunities drop out, and what should close when.' : 'Your funnel and what you expect to close.'} />
       {error && <Notice tone="error">{error}</Notice>}
 
       <div className="ts-toolbar !mb-0">
@@ -232,7 +232,7 @@ export default function Analysis() {
       </Card>
 
       <Card style={stagger(1)}>
-        <CardHeader title="Sales funnel" description="How far the deals opened in this period have got." />
+        <CardHeader title="Sales funnel" description="How far the opportunities opened in this period have got." />
         <div className="px-4 sm:px-5 pt-3">
           <div className="ts-tabs" role="tablist" aria-label="Period">
             {FUNNEL_PERIODS.map(([value, label]) => (
@@ -276,7 +276,7 @@ export default function Analysis() {
 
       {funnel && (
         <Card style={stagger(3)}>
-          <CardHeader title="Open pipeline right now" description="Every open deal, whenever it was opened." />
+          <CardHeader title="Open pipeline right now" description="Every open opportunity, whenever it was opened." />
           <ul className="divide-y divide-dashed divide-line overflow-hidden rounded-b-card">
             {funnel.open_by_stage.map((s) => (
               <li key={s.stage} className="px-4 sm:px-5 py-2.5 flex items-center justify-between gap-3 text-sm">

@@ -5,7 +5,7 @@ import { Badge, Button, Card, CardHeader, Notice, PageHeader } from '../../compo
 const STEPS: { kind: ImportKind; title: string; text: string }[] = [
   { kind: 'companies', title: '1. Companies', text: 'Customers and prospects. Imported as approved.' },
   { kind: 'contacts', title: '2. Contacts', text: 'People at those companies. Phone numbers must be unique.' },
-  { kind: 'deals', title: '3. Open deals', text: 'Needs the companies, salespeople and products in place first.' },
+  { kind: 'deals', title: '3. Open opportunities', text: 'Needs the companies, salespeople and products in place first.' },
 ];
 
 // Excel or CSV, in three steps. Nothing changes until the preview has been read and confirmed.
@@ -59,7 +59,7 @@ export default function Import() {
 
   return (
     <div className="max-w-3xl flex flex-col gap-5">
-      <PageHeader title="Import data" description="Bring in existing customers, contacts and open deals from Excel or CSV. Do them in this order." />
+      <PageHeader title="Import data" description="Bring in existing customers, contacts and open opportunities from Excel or CSV. Do them in this order." />
 
       <div className="ts-grid ts-row3 !mt-0" role="tablist" aria-label="What to import">
         {STEPS.map((s) => (

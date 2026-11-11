@@ -41,7 +41,7 @@ export default function Tenders() {
 
   return (
     <div>
-      <PageHeader title="Tenders" description="Add tender details from the deal page of any deal marked as a tender." />
+      <PageHeader title="Tenders" description="Add tender details from the opportunity page of any opportunity marked as a tender." />
       {error && <Notice tone="error">{error}</Notice>}
       {view === 'emd' && rows && rows.length > 0 && (
         <p className="ts-box text-sm mb-4">
@@ -76,7 +76,7 @@ export default function Tenders() {
               <table>
                 <thead>
                   <tr>
-                    <th>Deal</th>
+                    <th>Opportunity</th>
                     <th>Company</th>
                     <th>Tender no.</th>
                     <th>Authority</th>
