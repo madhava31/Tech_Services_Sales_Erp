@@ -22,7 +22,7 @@ async function visit(salespersonId, companyId, daysAgo, userId) {
   );
 }
 
-async function deal(ownerId, companyId, userId, { createdDaysAgo, stage = 'qualified', value = 100000, closedDaysAgo = null, won = null, lostReason = null, probability = 25 }) {
+async function deal(ownerId, companyId, userId, { createdDaysAgo, stage = 'qualify', value = 100000, closedDaysAgo = null, won = null, lostReason = null, probability = 25 }) {
   const [{ id }] = await query(
     `INSERT INTO opportunity (company_id, title, owner_salesperson_id, original_owner_salesperson_id, stage, estimated_value, probability,
                               won_value, lost_reason, close_reason, closed_at, created_by, created_at)
@@ -53,12 +53,12 @@ before(async () => {
   await visit(ravi.salespersonId, b, 40, ravi.userId); // outside 30 days
   await visit(priya.salespersonId, c, 3, priya.userId);
 
-  // Ravi's deals: one won (₹2,00,000 after 20 days), one lost, one open quotation_sent.
+  // Ravi's deals: one won (₹2,00,000 after 20 days), one lost, one open at Prove.
   await deal(ravi.salespersonId, a, ravi.userId, { createdDaysAgo: 25, stage: 'won', won: 200000, closedDaysAgo: 5, probability: 100 });
   await deal(ravi.salespersonId, b, ravi.userId, { createdDaysAgo: 20, stage: 'lost', lostReason: 'price', closedDaysAgo: 2, probability: 0 });
-  const open = await deal(ravi.salespersonId, b, ravi.userId, { createdDaysAgo: 15, stage: 'quotation_sent', value: 300000, probability: 50 });
+  const open = await deal(ravi.salespersonId, b, ravi.userId, { createdDaysAgo: 15, stage: 'prove', value: 300000, probability: 50 });
   await query(`INSERT INTO opportunity_history (opportunity_id, change_type, from_value, to_value, changed_by, changed_at)
-               VALUES ($1, 'stage', 'qualified', 'quotation_requested', $2, ${ago(12)})`, [open, ravi.userId]);
+               VALUES ($1, 'stage', 'qualify', 'develop', $2, ${ago(12)})`, [open, ravi.userId]);
   await query(`INSERT INTO quotation_link (opportunity_id, quotation_number, status, amount, quotation_date, created_by)
                VALUES ($1, 'Q1', 'sent', 300000, (NOW() AT TIME ZONE 'Asia/Kolkata')::date - 10, $2)`, [open, ravi.userId]);
   // Priya: one open deal.

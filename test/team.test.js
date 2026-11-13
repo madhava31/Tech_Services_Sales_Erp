@@ -45,9 +45,12 @@ test('the demo loader refuses to run twice and leaves consistent data', async ()
             (SELECT COUNT(*)::int FROM opportunity) AS deals,
             (SELECT COUNT(*)::int FROM opportunity o WHERE (SELECT h.to_value FROM opportunity_history h WHERE h.opportunity_id = o.id ORDER BY h.changed_at DESC, h.id DESC LIMIT 1) <> o.stage) AS mismatched,
             (SELECT COUNT(*)::int FROM visit WHERE visited_at > NOW()) AS future_visits,
-            (SELECT COUNT(*)::int FROM opportunity WHERE stage = 'abandoned') AS abandoned,
-            (SELECT COUNT(*)::int FROM opportunity WHERE stage NOT IN ('won', 'lost', 'abandoned') AND expected_close_date < (NOW() AT TIME ZONE 'Asia/Kolkata')::date) AS overdue,
-            (SELECT COUNT(*)::int FROM opportunity WHERE oem_id IS NULL OR expected_close_date IS NULL OR estimated_value IS NULL
+            (SELECT COUNT(*)::int FROM opportunity WHERE stage = 'lost') AS lost,
+            (SELECT COUNT(*)::int FROM opportunity WHERE code !~ '^TS-[A-Z][A-Z0-9]*-[0-9]{4,}$') AS bad_ids,
+            (SELECT COUNT(*)::int FROM opportunity o WHERE EXISTS (SELECT 1 FROM opportunity_product op JOIN product p ON p.id = op.product_id
+              WHERE op.opportunity_id = o.id AND NOT EXISTS (SELECT 1 FROM opportunity_oem oo WHERE oo.opportunity_id = o.id AND oo.oem_id = p.oem_id))) AS product_outside_oems,
+            (SELECT COUNT(*)::int FROM opportunity WHERE stage NOT IN ('won', 'lost') AND expected_close_date < (NOW() AT TIME ZONE 'Asia/Kolkata')::date) AS overdue,
+            (SELECT COUNT(*)::int FROM opportunity WHERE NOT EXISTS (SELECT 1 FROM opportunity_oem oo WHERE oo.opportunity_id = opportunity.id) OR expected_close_date IS NULL OR estimated_value IS NULL
               OR NOT EXISTS (SELECT 1 FROM opportunity_product op WHERE op.opportunity_id = opportunity.id)) AS incomplete,
             (SELECT COUNT(*)::int FROM opportunity o JOIN company c ON c.id = o.company_id WHERE c.approval_status <> 'approved') AS deals_on_unapproved,
             (SELECT COUNT(*)::int FROM company WHERE approval_status = 'pending') AS pending,
@@ -55,7 +58,9 @@ test('the demo loader refuses to run twice and leaves consistent data', async ()
             (SELECT COUNT(*)::int FROM installed_instrument) AS instruments,
             (SELECT COUNT(*)::int FROM reorder_plan) AS reorders`
   );
-  assert.ok(row.abandoned >= 1);
+  assert.ok(row.lost >= 1);
+  assert.equal(row.bad_ids, 0, 'every opportunity has an ID like TS-R-0001');
+  assert.equal(row.product_outside_oems, 0, 'products belong to the opportunity’s OEMs');
   assert.ok(row.overdue >= 1);
   assert.ok(row.pending >= 1);
   assert.ok(row.tenders >= 1);
@@ -107,7 +112,7 @@ test('handover moves open deals and follow-ups, keeps history and original owner
   const preview = (await manager.request('GET', `/api/handover/preview?from_salesperson_id=${priyaId}`)).body;
   assert.ok(preview.deals.length > 0, 'Priya has open deals in the demo data');
   const [before] = await query(
-    `SELECT (SELECT COUNT(*)::int FROM opportunity WHERE owner_salesperson_id = $1 AND stage IN ('won', 'lost', 'abandoned')) AS closed,
+    `SELECT (SELECT COUNT(*)::int FROM opportunity WHERE owner_salesperson_id = $1 AND stage IN ('won', 'lost')) AS closed,
             (SELECT COUNT(*)::int FROM visit WHERE salesperson_id = $1) AS visits`,
     [priyaId]
   );
@@ -122,9 +127,9 @@ test('handover moves open deals and follow-ups, keeps history and original owner
   assert.equal(res.body.deals_moved, preview.deals.length);
 
   const [afterRow] = await query(
-    `SELECT (SELECT COUNT(*)::int FROM opportunity WHERE owner_salesperson_id = $1 AND stage NOT IN ('won', 'lost', 'abandoned')) AS open,
+    `SELECT (SELECT COUNT(*)::int FROM opportunity WHERE owner_salesperson_id = $1 AND stage NOT IN ('won', 'lost')) AS open,
             (SELECT COUNT(*)::int FROM task WHERE assignee_salesperson_id = $1 AND status = 'open') AS tasks,
-            (SELECT COUNT(*)::int FROM opportunity WHERE owner_salesperson_id = $1 AND stage IN ('won', 'lost', 'abandoned')) AS closed,
+            (SELECT COUNT(*)::int FROM opportunity WHERE owner_salesperson_id = $1 AND stage IN ('won', 'lost')) AS closed,
             (SELECT COUNT(*)::int FROM visit WHERE salesperson_id = $1) AS visits`,
     [priyaId]
   );
@@ -150,7 +155,7 @@ test('handover moves open deals and follow-ups, keeps history and original owner
 
 test('a single deal can be transferred by a manager only', async () => {
   const [{ id: dealId, owner_salesperson_id: ownerId }] = await query(
-    `SELECT id, owner_salesperson_id FROM opportunity WHERE owner_salesperson_id = $1 AND stage NOT IN ('won', 'lost', 'abandoned') LIMIT 1`,
+    `SELECT id, owner_salesperson_id FROM opportunity WHERE owner_salesperson_id = $1 AND stage NOT IN ('won', 'lost') LIMIT 1`,
     [raviId]
   );
   assert.equal((await ravi.request('POST', `/api/opportunities/${dealId}/owner`, { to_salesperson_id: priyaId, reason: 'x' })).status, 403);
@@ -166,7 +171,7 @@ test('a single deal can be transferred by a manager only', async () => {
 test('a salesperson with open work cannot be deactivated until it is handed over', async () => {
   const [{ id: arjunId }] = await query(`SELECT id FROM salesperson WHERE name = 'Arjun Rao'`);
   const blocked = await admin.request('POST', `/api/admin/salespeople/${arjunId}/deactivate`);
-  const [{ open }] = await query(`SELECT COUNT(*)::int AS open FROM opportunity WHERE owner_salesperson_id = $1 AND stage NOT IN ('won', 'lost', 'abandoned')`, [arjunId]);
+  const [{ open }] = await query(`SELECT COUNT(*)::int AS open FROM opportunity WHERE owner_salesperson_id = $1 AND stage NOT IN ('won', 'lost')`, [arjunId]);
   if (open > 0) {
     assert.equal(blocked.status, 409);
     assert.match(blocked.body.error, /Hand them over first/);

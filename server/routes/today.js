@@ -76,7 +76,7 @@ router.get('/', async (req, res) => {
       .prepare(
         `SELECT o.id, o.title, o.stage, o.estimated_value, o.expected_close_date, c.name AS company_name, sp.name AS owner_name
          FROM opportunity o JOIN company c ON c.id = o.company_id JOIN salesperson sp ON sp.id = o.owner_salesperson_id
-         WHERE o.stage NOT IN ('won', 'lost', 'abandoned') AND o.expected_close_date < ${TODAY_SQL}${dealScope}
+         WHERE o.stage NOT IN ('won', 'lost') AND o.expected_close_date < ${TODAY_SQL}${dealScope}
          ORDER BY o.expected_close_date, o.id LIMIT 50`
       )
       .all(...dealParams);
@@ -115,7 +115,7 @@ router.get('/', async (req, res) => {
          JOIN quotation_link q ON q.opportunity_id = o.id
          JOIN erp_order eo ON eo.erp_quotation_id = q.erp_quotation_id
          JOIN company c ON c.id = o.company_id JOIN salesperson sp ON sp.id = o.owner_salesperson_id
-         WHERE o.stage NOT IN ('won', 'lost', 'abandoned')${orderScope}
+         WHERE o.stage NOT IN ('won', 'lost')${orderScope}
          ORDER BY o.id, eo.id DESC LIMIT 30`
       )
       .all(...orderParams);

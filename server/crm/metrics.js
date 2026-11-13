@@ -34,7 +34,7 @@ export async function computeMetrics({ salespersonIds = null, from, to }) {
       (SELECT COUNT(*) FROM opportunity o
         WHERE ${inRange('o.created_at')}${scope('o.original_owner_salesperson_id')}) AS deals_opened,
       (SELECT COUNT(DISTINCT h.opportunity_id) FROM opportunity_history h JOIN opportunity o ON o.id = h.opportunity_id
-        WHERE h.to_value = 'quotation_requested' AND h.change_type IN ('created', 'stage')
+        WHERE h.to_value = 'develop' AND h.change_type IN ('created', 'stage')
           AND ${inRange('h.changed_at')}${scope('o.owner_salesperson_id')}) AS quotation_requests,
       (SELECT COUNT(*) FROM quotation_link q JOIN opportunity o ON o.id = q.opportunity_id
         WHERE q.status <> 'draft'
@@ -49,17 +49,15 @@ export async function computeMetrics({ salespersonIds = null, from, to }) {
       (SELECT AVG(EXTRACT(EPOCH FROM (o.closed_at - o.created_at)) / 86400) FROM opportunity o
         WHERE o.stage = 'won' AND ${inRange('o.closed_at')}${scope('o.owner_salesperson_id')}) AS avg_days_to_win,
       (SELECT COUNT(*) FROM opportunity o
-        WHERE o.stage = 'abandoned' AND ${inRange('o.closed_at')}${scope('o.owner_salesperson_id')}) AS deals_abandoned,
-      (SELECT COUNT(*) FROM opportunity o
-        WHERE o.stage NOT IN ('won', 'lost', 'abandoned') AND o.expected_close_date < ${TODAY_SQL}${scope('o.owner_salesperson_id')}) AS overdue_deals,
+        WHERE o.stage NOT IN ('won', 'lost') AND o.expected_close_date < ${TODAY_SQL}${scope('o.owner_salesperson_id')}) AS overdue_deals,
       (SELECT COUNT(*) FROM opportunity o
         WHERE ${STUCK_SQL}${scope('o.owner_salesperson_id')}) AS stuck_deals,
       (SELECT COUNT(*) FROM opportunity o
-        WHERE o.stage NOT IN ('won', 'lost', 'abandoned')${scope('o.owner_salesperson_id')}) AS open_deals,
+        WHERE o.stage NOT IN ('won', 'lost')${scope('o.owner_salesperson_id')}) AS open_deals,
       (SELECT COALESCE(SUM(o.estimated_value), 0) FROM opportunity o
-        WHERE o.stage NOT IN ('won', 'lost', 'abandoned')${scope('o.owner_salesperson_id')}) AS pipeline_value,
+        WHERE o.stage NOT IN ('won', 'lost')${scope('o.owner_salesperson_id')}) AS pipeline_value,
       (SELECT COALESCE(SUM(o.estimated_value * o.probability / 100.0), 0) FROM opportunity o
-        WHERE o.stage NOT IN ('won', 'lost', 'abandoned')${scope('o.owner_salesperson_id')}) AS weighted_pipeline,
+        WHERE o.stage NOT IN ('won', 'lost')${scope('o.owner_salesperson_id')}) AS weighted_pipeline,
       (SELECT COUNT(*) FROM task t
         WHERE t.status = 'open' AND t.due_date < ${TODAY_SQL}${scope('t.assignee_salesperson_id')}) AS overdue_follow_ups`;
 
@@ -96,7 +94,6 @@ export async function computeMetrics({ salespersonIds = null, from, to }) {
     deals_won: won,
     won_value: n(row.won_value),
     deals_lost: lost,
-    deals_abandoned: n(row.deals_abandoned),
     // Of the deals closed in the period, the share won. null when nothing closed.
     win_rate: won + lost > 0 ? Math.round((won / (won + lost)) * 1000) / 10 : null,
     avg_days_to_win: row.avg_days_to_win === null ? null : Math.round(Number(row.avg_days_to_win) * 10) / 10,

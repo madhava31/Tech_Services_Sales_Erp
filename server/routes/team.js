@@ -31,7 +31,7 @@ router.get('/performance', async (req, res) => {
          -- always add up to the team total.
          WHERE sp.is_active
             OR EXISTS (SELECT 1 FROM opportunity o WHERE (o.owner_salesperson_id = sp.id OR o.original_owner_salesperson_id = sp.id)
-                       AND (o.stage NOT IN ('won', 'lost', 'abandoned') OR o.closed_at >= (?::date::timestamp AT TIME ZONE 'Asia/Kolkata')
+                       AND (o.stage NOT IN ('won', 'lost') OR o.closed_at >= (?::date::timestamp AT TIME ZONE 'Asia/Kolkata')
                             OR o.created_at >= (?::date::timestamp AT TIME ZONE 'Asia/Kolkata')))
             OR EXISTS (SELECT 1 FROM visit v WHERE v.salesperson_id = sp.id
                        AND v.visited_at >= (?::date::timestamp AT TIME ZONE 'Asia/Kolkata'))
@@ -78,14 +78,14 @@ router.get('/insights', async (req, res) => {
         `SELECT COALESCE(prod.category, cat.product_category, 'Not specified') AS category,
                 COUNT(*) FILTER (WHERE o.stage = 'won' AND ${range})::int AS deals_won,
                 COALESCE(SUM(o.won_value) FILTER (WHERE o.stage = 'won' AND ${range}), 0)::float AS won_value,
-                COUNT(*) FILTER (WHERE o.stage NOT IN ('won', 'lost', 'abandoned'))::int AS open_deals,
-                COALESCE(SUM(o.estimated_value) FILTER (WHERE o.stage NOT IN ('won', 'lost', 'abandoned')), 0)::float AS pipeline_value
+                COUNT(*) FILTER (WHERE o.stage NOT IN ('won', 'lost'))::int AS open_deals,
+                COALESCE(SUM(o.estimated_value) FILTER (WHERE o.stage NOT IN ('won', 'lost')), 0)::float AS pipeline_value
          FROM opportunity o
          LEFT JOIN LATERAL (SELECT r.product_category FROM requirement r WHERE r.opportunity_id = o.id ORDER BY r.id LIMIT 1) cat ON TRUE
          LEFT JOIN LATERAL (SELECT p.category FROM opportunity_product op JOIN product p ON p.id = op.product_id
                             WHERE op.opportunity_id = o.id ORDER BY p.name LIMIT 1) prod ON TRUE
          GROUP BY 1
-         HAVING COUNT(*) FILTER (WHERE o.stage = 'won' AND ${range}) > 0 OR COUNT(*) FILTER (WHERE o.stage NOT IN ('won', 'lost', 'abandoned')) > 0
+         HAVING COUNT(*) FILTER (WHERE o.stage = 'won' AND ${range}) > 0 OR COUNT(*) FILTER (WHERE o.stage NOT IN ('won', 'lost')) > 0
          ORDER BY won_value DESC, pipeline_value DESC`
       )
       .all(from, to, from, to, from, to);
@@ -95,11 +95,11 @@ router.get('/insights', async (req, res) => {
         `SELECT COALESCE(NULLIF(btrim(c.city), ''), 'Not specified') AS city,
                 COUNT(*) FILTER (WHERE o.stage = 'won' AND ${range})::int AS deals_won,
                 COALESCE(SUM(o.won_value) FILTER (WHERE o.stage = 'won' AND ${range}), 0)::float AS won_value,
-                COUNT(*) FILTER (WHERE o.stage NOT IN ('won', 'lost', 'abandoned'))::int AS open_deals,
-                COALESCE(SUM(o.estimated_value) FILTER (WHERE o.stage NOT IN ('won', 'lost', 'abandoned')), 0)::float AS pipeline_value
+                COUNT(*) FILTER (WHERE o.stage NOT IN ('won', 'lost'))::int AS open_deals,
+                COALESCE(SUM(o.estimated_value) FILTER (WHERE o.stage NOT IN ('won', 'lost')), 0)::float AS pipeline_value
          FROM opportunity o JOIN company c ON c.id = o.company_id
          GROUP BY 1
-         HAVING COUNT(*) FILTER (WHERE o.stage = 'won' AND ${range}) > 0 OR COUNT(*) FILTER (WHERE o.stage NOT IN ('won', 'lost', 'abandoned')) > 0
+         HAVING COUNT(*) FILTER (WHERE o.stage = 'won' AND ${range}) > 0 OR COUNT(*) FILTER (WHERE o.stage NOT IN ('won', 'lost')) > 0
          ORDER BY won_value DESC, pipeline_value DESC`
       )
       .all(from, to, from, to, from, to);
@@ -109,11 +109,12 @@ router.get('/insights', async (req, res) => {
         `SELECT COALESCE(e.name, 'Not specified') AS oem,
                 COUNT(*) FILTER (WHERE o.stage = 'won' AND ${range})::int AS deals_won,
                 COALESCE(SUM(o.won_value) FILTER (WHERE o.stage = 'won' AND ${range}), 0)::float AS won_value,
-                COUNT(*) FILTER (WHERE o.stage NOT IN ('won', 'lost', 'abandoned'))::int AS open_deals,
-                COALESCE(SUM(o.estimated_value) FILTER (WHERE o.stage NOT IN ('won', 'lost', 'abandoned')), 0)::float AS pipeline_value
-         FROM opportunity o LEFT JOIN oem e ON e.id = o.oem_id
+                COUNT(*) FILTER (WHERE o.stage NOT IN ('won', 'lost'))::int AS open_deals,
+                COALESCE(SUM(o.estimated_value) FILTER (WHERE o.stage NOT IN ('won', 'lost')), 0)::float AS pipeline_value
+         -- An opportunity with several OEMs counts under each of them.
+         FROM opportunity o LEFT JOIN opportunity_oem oo ON oo.opportunity_id = o.id LEFT JOIN oem e ON e.id = oo.oem_id
          GROUP BY 1
-         HAVING COUNT(*) FILTER (WHERE o.stage = 'won' AND ${range}) > 0 OR COUNT(*) FILTER (WHERE o.stage NOT IN ('won', 'lost', 'abandoned')) > 0
+         HAVING COUNT(*) FILTER (WHERE o.stage = 'won' AND ${range}) > 0 OR COUNT(*) FILTER (WHERE o.stage NOT IN ('won', 'lost')) > 0
          ORDER BY won_value DESC, pipeline_value DESC`
       )
       .all(from, to, from, to, from, to);
@@ -124,13 +125,13 @@ router.get('/insights', async (req, res) => {
         `SELECT COALESCE(s.name, 'Not specified') AS segment,
                 COUNT(*) FILTER (WHERE o.stage = 'won' AND ${range})::int AS deals_won,
                 COALESCE(SUM(o.won_value) FILTER (WHERE o.stage = 'won' AND ${range}), 0)::float AS won_value,
-                COUNT(*) FILTER (WHERE o.stage NOT IN ('won', 'lost', 'abandoned'))::int AS open_deals,
-                COALESCE(SUM(o.estimated_value) FILTER (WHERE o.stage NOT IN ('won', 'lost', 'abandoned')), 0)::float AS pipeline_value
+                COUNT(*) FILTER (WHERE o.stage NOT IN ('won', 'lost'))::int AS open_deals,
+                COALESCE(SUM(o.estimated_value) FILTER (WHERE o.stage NOT IN ('won', 'lost')), 0)::float AS pipeline_value
          FROM opportunity o
          LEFT JOIN opportunity_segment os ON os.opportunity_id = o.id
          LEFT JOIN market_segment s ON s.id = os.segment_id
          GROUP BY 1
-         HAVING COUNT(*) FILTER (WHERE o.stage = 'won' AND ${range}) > 0 OR COUNT(*) FILTER (WHERE o.stage NOT IN ('won', 'lost', 'abandoned')) > 0
+         HAVING COUNT(*) FILTER (WHERE o.stage = 'won' AND ${range}) > 0 OR COUNT(*) FILTER (WHERE o.stage NOT IN ('won', 'lost')) > 0
          ORDER BY won_value DESC, pipeline_value DESC`
       )
       .all(from, to, from, to, from, to);
@@ -151,7 +152,7 @@ router.get('/insights', async (req, res) => {
              (SELECT MAX(q.updated_at) FROM quotation_link q WHERE q.opportunity_id = o.id),
              (SELECT MAX(l.created_at) FROM contact_log l WHERE l.opportunity_id = o.id)
            ) AS last_activity) act
-         WHERE o.stage NOT IN ('won', 'lost', 'abandoned')
+         WHERE o.stage NOT IN ('won', 'lost')
            AND act.last_activity < NOW() - make_interval(days => ?)
          ORDER BY o.estimated_value DESC NULLS LAST
          LIMIT 25`
@@ -163,7 +164,7 @@ router.get('/insights', async (req, res) => {
       .prepare(
         `SELECT sp.id AS salesperson_id, sp.name, COUNT(o.id)::int AS open_deals
          FROM salesperson sp
-         JOIN opportunity o ON o.owner_salesperson_id = sp.id AND o.stage NOT IN ('won', 'lost', 'abandoned')
+         JOIN opportunity o ON o.owner_salesperson_id = sp.id AND o.stage NOT IN ('won', 'lost')
          LEFT JOIN app_user u ON u.salesperson_id = sp.id
          WHERE NOT sp.is_active OR (u.id IS NOT NULL AND NOT u.is_active)
          GROUP BY sp.id, sp.name ORDER BY open_deals DESC`

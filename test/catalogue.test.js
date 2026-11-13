@@ -45,15 +45,23 @@ test('the six OEMs and four market segments are seeded', async () => {
   assert.deepEqual(segments, ['Pharma', 'Non-pharma', 'Food', 'Research & Analytics'], 'the fixed list, in its set order');
 });
 
-test('products: admin and office manage them; managers and salespeople only view', async () => {
+test('products: only Admin adds and edits them; everyone else only views', async () => {
   const body = { part_number: 'TS-PE-AAS', name: 'Atomic Absorption Spectrometer', oem_id: await oemId('PerkinElmer'), category: 'Spectroscopy', key_features: ['Flame', ' Furnace ', ''] };
   assert.equal((await ravi.client.request('POST', '/api/products', body)).status, 403);
   assert.equal((await manager.request('POST', '/api/products', body)).status, 403);
-  const created = await office.request('POST', '/api/products', body);
+  const refused = await office.request('POST', '/api/products', body);
+  assert.equal(refused.status, 403, 'office staff no longer add products');
+  assert.match(refused.body.error, /Only an admin/);
+  await createUser('md', 'managing_director');
+  const md = createClient(server.baseUrl);
+  await login(md, 'md');
+  assert.equal((await md.request('POST', '/api/products', body)).status, 403, 'nor does the MD');
+  const created = await admin.request('POST', '/api/products', body);
   assert.equal(created.status, 201);
   assert.deepEqual(created.body.key_features, ['Flame', 'Furnace']);
   assert.equal((await admin.request('POST', '/api/products', body)).status, 409, 'part numbers are unique');
   assert.equal((await ravi.client.request('PUT', `/api/products/${created.body.id}`, { name: 'x' })).status, 403);
+  assert.equal((await office.request('PUT', `/api/products/${created.body.id}`, { name: 'x' })).status, 403);
 
   const edited = await admin.request('PUT', `/api/products/${created.body.id}`, { category: 'Atomic spectroscopy' });
   assert.equal(edited.body.category, 'Atomic spectroscopy');
@@ -63,7 +71,7 @@ test('products: admin and office manage them; managers and salespeople only view
 });
 
 test('products: search by part number or name, filter by make, view the detail', async () => {
-  await office.request('POST', '/api/products', { part_number: 'TS-MT-XPR', name: 'Analytical Balance', oem_id: await oemId('Mettler Toledo'), key_features: ['0.1 mg'] });
+  await admin.request('POST', '/api/products', { part_number: 'TS-MT-XPR', name: 'Analytical Balance', oem_id: await oemId('Mettler Toledo'), key_features: ['0.1 mg'] });
   const list = async (qs) => (await ravi.client.request('GET', `/api/products${qs}`)).body.map((p) => p.part_number);
   assert.deepEqual(await list('?q=ts-mt'), ['TS-MT-XPR']);
   assert.deepEqual(await list('?q=balance'), ['TS-MT-XPR']);
@@ -78,11 +86,11 @@ test('products: search by part number or name, filter by make, view the detail',
 test('products are deactivated, never deleted', async () => {
   const [{ id }] = (await ravi.client.request('GET', '/api/products?q=balance')).body;
   assert.equal((await admin.request('DELETE', `/api/products/${id}`)).status, 404);
-  assert.equal((await office.request('PUT', `/api/products/${id}`, { is_active: false })).body.is_active, false);
+  assert.equal((await admin.request('PUT', `/api/products/${id}`, { is_active: false })).body.is_active, false);
   assert.deepEqual((await ravi.client.request('GET', '/api/products?q=balance')).body, [], 'gone from pickers');
-  assert.equal((await office.request('GET', '/api/products?q=balance&include_inactive=1')).body.length, 1);
+  assert.equal((await admin.request('GET', '/api/products?q=balance&include_inactive=1')).body.length, 1);
   assert.equal((await ravi.client.request('GET', '/api/products?q=balance&include_inactive=1')).body.length, 0, 'salespeople see active ones only');
-  await office.request('PUT', `/api/products/${id}`, { is_active: true });
+  await admin.request('PUT', `/api/products/${id}`, { is_active: true });
 });
 
 test('OEMs and market segments: only MD/Admin manage them; in use can be deactivated, not deleted', async () => {

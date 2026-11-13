@@ -79,7 +79,6 @@ export default function Performance() {
               <Tile i={6} label="Quotations sent" value={m.quotations_sent} />
               <Tile i={7} label="Opportunities won" value={m.deals_won} tone="ok" hint={formatMoney(m.won_value)} />
               <Tile i={8} label="Opportunities lost" value={m.deals_lost} />
-              <Tile i={9} label="Opportunities abandoned" value={m.deals_abandoned} />
               <Tile i={10} label="Win rate" value={m.win_rate === null ? '—' : `${m.win_rate}%`} hint="Of opportunities closed in the period" />
               <Tile i={11} label="Days to win" value={m.avg_days_to_win ?? '—'} hint="Average, opened → won" />
             </div>

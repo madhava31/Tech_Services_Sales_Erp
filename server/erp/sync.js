@@ -117,7 +117,7 @@ async function syncQuotations(adapter, counts) {
         .prepare(`UPDATE quotation_link SET erp_quotation_id = ?, source = 'erp', quotation_number = ?, quotation_date = ?, amount = ?, status = ?, updated_at = NOW() WHERE id = ?`)
         .run(link.e_id, link.e_number, link.e_date, link.e_total, status, link.id);
       if (status !== 'draft' && isOpen(link.stage)) {
-        await advanceIfBehind({ opportunity: { id: link.opportunity_id, title: link.title, stage: link.stage }, stage: 'quotation_sent', userId: null, note: `Quotation ${link.e_number} in the ERP` });
+        await advanceIfBehind({ opportunity: { id: link.opportunity_id, title: link.title, stage: link.stage }, stage: 'prove', userId: null, note: `Quotation ${link.e_number} in the ERP` });
       }
       await recordAudit({
         actorUserId: null,

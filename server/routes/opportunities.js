@@ -16,11 +16,12 @@ import { TODAY_SQL, oneOf, optionalDate, optionalId, optionalNumber, optionalTex
 import {
   CLOSED_STAGES,
   DEFAULT_PROBABILITY,
-  LOST_REASONS,
   OPEN_STAGES,
   QUOTATION_STATUSES,
+  QUOTED_STAGES,
   STAGE_KEYS,
   advanceIfBehind,
+  closeFields,
   isOpen,
   recordHistory,
 } from '../crm/pipeline.js';
@@ -32,20 +33,30 @@ import { DAYS_IN_STAGE_SQL, STUCK_AFTER_SQL, STUCK_SQL } from '../crm/stuck.js';
 // is kept in opportunity_history and written to the audit log.
 const router = Router();
 
-const OPEN_SQL = `o.stage NOT IN ('won', 'lost', 'abandoned')`;
+const OPEN_SQL = `o.stage NOT IN ('won', 'lost')`;
 const OVERDUE_SQL = `(${OPEN_SQL} AND o.expected_close_date < ${TODAY_SQL})`;
 
+// Downloading every opportunity to Excel is for Admin only.
+function requireExcelExport(req, res, next) {
+  if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Only an admin can download the opportunities to Excel.' });
+  next();
+}
+
 const OPPORTUNITY_SELECT = `
-  SELECT o.id, o.company_id, c.name AS company_name, c.city AS company_city, o.title,
-         o.owner_salesperson_id, sp.name AS owner_name,
+  SELECT o.id, o.code, o.company_id, c.name AS company_name, c.city AS company_city, o.title,
+         o.owner_salesperson_id, sp.name AS owner_name, sp.id_prefix AS owner_id_prefix,
          o.original_owner_salesperson_id, osp.name AS original_owner_name,
          o.stage, o.estimated_value, o.probability, o.probability_reason, o.tender, o.expected_close_date,
          o.source_visit_id, o.notes, o.won_value, o.lost_reason, o.close_reason, o.closed_at, o.created_at, o.updated_at,
-         o.oem_id, e.name AS oem_name, o.contact_id, cc.name AS contact_name, cc.phone AS contact_phone,
+         o.competitor, o.competitor_note, o.contact_id, cc.name AS contact_name, cc.phone AS contact_phone,
+         cc.email AS contact_email, cc.designation AS contact_designation, cc.department AS contact_department,
+         (SELECT COALESCE(json_agg(json_build_object('id', e.id, 'name', e.name, 'is_active', e.is_active) ORDER BY e.name), '[]')
+          FROM opportunity_oem oo JOIN oem e ON e.id = oo.oem_id WHERE oo.opportunity_id = o.id) AS oems,
+         (SELECT string_agg(e.name, ', ' ORDER BY e.name) FROM opportunity_oem oo JOIN oem e ON e.id = oo.oem_id WHERE oo.opportunity_id = o.id) AS oem_name,
          ${OVERDUE_SQL} AS is_overdue,
          ${DAYS_IN_STAGE_SQL} AS days_in_stage, ${STUCK_AFTER_SQL} AS stuck_after_days, ${STUCK_SQL} AS is_stuck,
          (SELECT COUNT(*)::int FROM quotation_link q WHERE q.opportunity_id = o.id) AS quotation_count,
-         (SELECT COALESCE(json_agg(json_build_object('id', p.id, 'part_number', p.part_number, 'name', p.name, 'is_active', p.is_active) ORDER BY p.name), '[]')
+         (SELECT COALESCE(json_agg(json_build_object('id', p.id, 'part_number', p.part_number, 'name', p.name, 'oem_id', p.oem_id, 'is_active', p.is_active) ORDER BY p.name), '[]')
           FROM opportunity_product op JOIN product p ON p.id = op.product_id WHERE op.opportunity_id = o.id) AS products,
          (SELECT COALESCE(json_agg(json_build_object('id', s.id, 'name', s.name, 'is_active', s.is_active) ORDER BY s.name), '[]')
           FROM opportunity_segment os JOIN market_segment s ON s.id = os.segment_id WHERE os.opportunity_id = o.id) AS segments
@@ -53,7 +64,6 @@ const OPPORTUNITY_SELECT = `
   JOIN company c ON c.id = o.company_id
   JOIN salesperson sp ON sp.id = o.owner_salesperson_id
   JOIN salesperson osp ON osp.id = o.original_owner_salesperson_id
-  LEFT JOIN oem e ON e.id = o.oem_id
   LEFT JOIN company_contact cc ON cc.id = o.contact_id`;
 
 export async function loadVisibleOpportunity(user, id) {
@@ -94,12 +104,16 @@ function dealFilters(req) {
   for (const [key, column] of [
     ['owner_id', 'o.owner_salesperson_id'],
     ['company_id', 'o.company_id'],
-    ['oem_id', 'o.oem_id'],
   ]) {
     if (req.query[key]) {
       where += ` AND ${column} = ?`;
       params.push(Number(req.query[key]));
     }
+  }
+  // An opportunity with several OEMs is found under each of them.
+  if (req.query.oem_id) {
+    where += ' AND EXISTS (SELECT 1 FROM opportunity_oem oo2 WHERE oo2.opportunity_id = o.id AND oo2.oem_id = ?)';
+    params.push(Number(req.query.oem_id));
   }
   if (req.query.segment_id) {
     where += ' AND EXISTS (SELECT 1 FROM opportunity_segment os2 WHERE os2.opportunity_id = o.id AND os2.segment_id = ?)';
@@ -121,74 +135,97 @@ router.get('/', async (req, res) => {
 });
 
 const STAGE_NAMES = {
-  new_prospect: 'New prospect',
-  visit_completed: 'Visited',
-  qualified: 'Qualified',
-  quotation_requested: 'Quote requested',
-  quotation_sent: 'Quote sent',
+  create: 'Create',
+  qualify: 'Qualify',
+  develop: 'Develop',
+  prove: 'Prove',
   negotiation: 'Negotiation',
   won: 'Won',
   lost: 'Lost',
-  abandoned: 'Abandoned',
 };
+
+const COMPETITOR_NAMES = { no_idea: 'No idea', no_competitor: 'No competitor' };
 
 // Indian digit grouping: 68,50,000 and 1,25,00,000.
 const INR_FORMAT = '[>=10000000]##\\,##\\,##\\,##0;[>=100000]##\\,##\\,##0;##,##0';
 
-// The deal list as a spreadsheet, with the same filters and access as the list.
-router.get('/export.xlsx', async (req, res) => {
+// The columns of the opportunities spreadsheet, in the agreed order: who and what first, then the
+// rest. `key` is what the download panel sends back to choose columns. OEMs are a group: one OEM and
+// one Products column for each OEM the largest opportunity in the file has.
+const EXPORT_COLUMNS = [
+  { key: 'created', header: 'Created date', width: 13, numFmt: 'dd-mmm-yyyy', value: (d) => new Date(d.created_at) },
+  { key: 'company', header: 'Company name', width: 30, value: (d) => d.company_name },
+  { key: 'contact', header: 'Contact name', width: 22, value: (d) => d.contact_name },
+  { key: 'phone', header: 'Contact number', width: 16, value: (d) => d.contact_phone },
+  { key: 'email', header: 'Contact email', width: 26, value: (d) => d.contact_email },
+  { key: 'designation', header: 'Designation', width: 18, value: (d) => d.contact_designation },
+  { key: 'department', header: 'Department', width: 18, value: (d) => d.contact_department },
+  { key: 'code', header: 'Opportunity ID', width: 14, value: (d) => d.code },
+  { key: 'deal', header: 'Opportunity', width: 34, value: (d) => d.title },
+  { key: 'oems', header: 'OEMs and their products', oems: true },
+  { key: 'salesperson', header: 'Salesperson', width: 20, value: (d) => d.owner_name },
+  { key: 'salesperson_id', header: 'Salesperson ID', width: 12, value: (d) => d.owner_id_prefix },
+  { key: 'stage', header: 'Stage', width: 14, value: (d) => STAGE_NAMES[d.stage] },
+  { key: 'closing', header: 'Closing date', width: 14, numFmt: 'dd-mmm-yyyy', value: (d) => (d.expected_close_date ? new Date(`${d.expected_close_date}T00:00:00Z`) : null) },
+  { key: 'probability', header: 'Win probability %', width: 11, value: (d) => d.probability },
+  { key: 'probability_reason', header: 'Probability reason', width: 28, value: (d) => d.probability_reason },
+  { key: 'value', header: 'Order value (INR)', width: 16, numFmt: INR_FORMAT, value: (d) => d.won_value ?? d.estimated_value },
+  {
+    key: 'weighted',
+    header: 'Weighted value',
+    width: 16,
+    numFmt: INR_FORMAT,
+    value: (d) => {
+      const v = d.won_value ?? d.estimated_value;
+      return v == null ? null : Math.round((v * d.probability) / 100);
+    },
+  },
+  { key: 'tender', header: 'Tender', width: 8, value: (d) => (d.tender ? 'Yes' : 'No') },
+  { key: 'segment', header: 'Market segment', width: 26, value: (d) => d.segments.map((s) => s.name).join(', ') },
+  { key: 'competitor', header: 'Competitor', width: 24, value: (d) => (d.competitor === 'other' ? d.competitor_note : COMPETITOR_NAMES[d.competitor] ?? '') },
+  { key: 'outcome', header: 'Outcome', width: 11, value: (d) => (isOpen(d.stage) ? '' : STAGE_NAMES[d.stage]) },
+  { key: 'overdue', header: 'Overdue', width: 9, value: (d) => (d.is_overdue ? 'Yes' : 'No') },
+  { key: 'remarks', header: 'Close reason / comments', width: 44, value: (d) => [d.close_reason, d.notes].filter(Boolean).join(' / ') },
+];
+
+// The admin's download panel lists these, ticked by default.
+router.get('/export-columns', requireExcelExport, (req, res) => {
+  res.json(EXPORT_COLUMNS.map(({ key, header }) => ({ key, label: header })));
+});
+
+// The deal list as a spreadsheet, with the list's filters. Admin only. ?columns=created,company,…
+// keeps only those columns, in the agreed order.
+router.get('/export.xlsx', requireExcelExport, async (req, res) => {
   try {
     const { where, params, order } = dealFilters(req);
     const deals = await db.prepare(`${OPPORTUNITY_SELECT} ${where} ORDER BY ${order} LIMIT 10000`).all(...params);
+    const wanted = typeof req.query.columns === 'string' && req.query.columns.trim() ? new Set(req.query.columns.split(',').map((k) => k.trim())) : null;
+    const chosen = EXPORT_COLUMNS.filter((c) => !wanted || wanted.has(c.key));
+    if (chosen.length === 0) throw new HttpError(400, 'Choose at least one column.');
+
+    // Expand the OEM group: OEM 1, Products (OEM 1), OEM 2, Products (OEM 2), …
+    const maxOems = Math.max(1, ...deals.map((d) => d.oems.length));
+    const columns = chosen.flatMap((c) =>
+      c.oems
+        ? Array.from({ length: maxOems }, (_, i) => {
+            const label = maxOems === 1 ? '' : ` ${i + 1}`;
+            return [
+              { header: `OEM${label}`, width: 18, value: (d) => d.oems[i]?.name ?? null },
+              {
+                header: `Products (OEM${label})`,
+                width: 40,
+                value: (d) => (d.oems[i] ? d.products.filter((p) => p.oem_id === d.oems[i].id).map((p) => p.name).join(', ') : null),
+              },
+            ];
+          }).flat()
+        : [c]
+    );
+
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Opportunities', { views: [{ state: 'frozen', ySplit: 1 }] });
-    sheet.columns = [
-      { header: 'Created date', key: 'created', width: 13, style: { numFmt: 'dd-mmm-yyyy' } },
-      { header: 'Opportunity', key: 'deal', width: 34 },
-      { header: 'Company', key: 'company', width: 30 },
-      { header: 'Contact', key: 'contact', width: 22 },
-      { header: 'Phone', key: 'phone', width: 16 },
-      { header: 'Salesperson', key: 'salesperson', width: 20 },
-      { header: 'OEM', key: 'oem', width: 16 },
-      { header: 'Products', key: 'products', width: 40 },
-      { header: 'Stage', key: 'stage', width: 16 },
-      { header: 'Expected closing date', key: 'closing', width: 14, style: { numFmt: 'dd-mmm-yyyy' } },
-      { header: 'Win probability %', key: 'probability', width: 11 },
-      { header: 'Probability reason', key: 'probability_reason', width: 28 },
-      { header: 'Order value (INR)', key: 'value', width: 16, style: { numFmt: INR_FORMAT } },
-      { header: 'Weighted value', key: 'weighted', width: 16, style: { numFmt: INR_FORMAT } },
-      { header: 'Tender', key: 'tender', width: 8 },
-      { header: 'Market segment', key: 'segment', width: 26 },
-      { header: 'Outcome', key: 'outcome', width: 11 },
-      { header: 'Overdue', key: 'overdue', width: 9 },
-      { header: 'Close reason / comments', key: 'remarks', width: 44 },
-    ];
+    sheet.columns = columns.map((c, i) => ({ header: c.header, key: `c${i}`, width: c.width, style: c.numFmt ? { numFmt: c.numFmt } : undefined }));
     sheet.getRow(1).font = { bold: true };
-    for (const d of deals) {
-      const open = isOpen(d.stage);
-      const value = d.won_value ?? d.estimated_value;
-      sheet.addRow({
-        created: new Date(d.created_at),
-        deal: d.title,
-        company: d.company_name,
-        contact: d.contact_name,
-        phone: d.contact_phone,
-        salesperson: d.owner_name,
-        oem: d.oem_name,
-        products: d.products.map((p) => p.name).join(', '),
-        stage: STAGE_NAMES[d.stage],
-        closing: d.expected_close_date ? new Date(`${d.expected_close_date}T00:00:00Z`) : null,
-        probability: d.probability,
-        probability_reason: d.probability_reason,
-        value,
-        weighted: value == null ? null : Math.round((value * d.probability) / 100),
-        tender: d.tender ? 'Yes' : 'No',
-        segment: d.segments.map((s) => s.name).join(', '),
-        outcome: open ? '' : STAGE_NAMES[d.stage],
-        overdue: d.is_overdue ? 'Yes' : 'No',
-        remarks: [d.close_reason, d.notes].filter(Boolean).join(' / '),
-      });
-    }
+    for (const d of deals) sheet.addRow(Object.fromEntries(columns.map((c, i) => [`c${i}`, c.value(d) ?? null])));
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="technicon-opportunities.xlsx"');
     res.send(Buffer.from(await workbook.xlsx.writeBuffer()));
@@ -207,8 +244,8 @@ router.get('/quotation-requests', async (req, res) => {
         .prepare(
           `${OPPORTUNITY_SELECT},
            LATERAL (SELECT MAX(h.changed_at) AS requested_at FROM opportunity_history h
-                    WHERE h.opportunity_id = o.id AND h.change_type IN ('created', 'stage') AND h.to_value = 'quotation_requested') req
-           WHERE o.stage = 'quotation_requested'
+                    WHERE h.opportunity_id = o.id AND h.change_type IN ('created', 'stage') AND h.to_value = 'develop') req
+           WHERE o.stage = 'develop'
              AND NOT EXISTS (SELECT 1 FROM quotation_link q WHERE q.opportunity_id = o.id)${scope}
            ORDER BY req.requested_at ASC NULLS LAST`
         )
@@ -283,9 +320,21 @@ router.post('/', requireCrmWriter, async (req, res) => {
     if (!companyId) throw new HttpError(400, 'company_id is required');
     const company = await assertCompanyAcceptsDeals(companyId);
     const ownerId = await resolveOwner(req.user, req.body.owner_salesperson_id);
-    const stage = oneOf(req.body, 'stage', ['new_prospect', 'visit_completed', 'qualified'], 'new_prospect');
+    // Any stage. Closed as Won or Lost needs what closing needs; Prove and Negotiation need the
+    // quotation number, recorded on the opportunity as the quotation already sent.
+    const stage = oneOf(req.body, 'stage', STAGE_KEYS, 'create');
     const fields = await parseDealFields(req.body, { companyId });
-    const id = await db.transaction(() => insertOpportunity({ companyId, companyName: company.name, ownerId, stage, fields, userId: req.user.id }));
+    const close = closeFields(req.body, stage);
+    const quotationNumber = QUOTED_STAGES.includes(stage) ? requiredText(req.body, 'quotation_number', { max: 50 }) : null;
+    const id = await db.transaction(async () => {
+      const newId = await insertOpportunity({ companyId, companyName: company.name, ownerId, stage, fields, close, userId: req.user.id });
+      if (quotationNumber) {
+        await db
+          .prepare(`INSERT INTO quotation_link (opportunity_id, quotation_number, status, source, created_by) VALUES (?, ?, 'sent', 'manual', ?)`)
+          .run(newId, quotationNumber, req.user.id);
+      }
+      return newId;
+    });
     res.status(201).json(await loadVisibleOpportunity(req.user, id));
   } catch (err) {
     if (phoneConflict(res, err)) return;
@@ -348,7 +397,7 @@ router.post('/bulk', requireCrmWriter, async (req, res) => {
           }
         } else if (stage) {
           if (opp.stage === stage) skip('already there');
-          else if (['quotation_sent', 'negotiation'].includes(stage) && opp.quotation_count === 0) skip('needs a quotation first');
+          else if (QUOTED_STAGES.includes(stage) && opp.quotation_count === 0) skip('needs a quotation first');
           else {
             await db.prepare(`UPDATE opportunity SET stage = ?, updated_at = NOW() WHERE id = ?`).run(stage, id);
             await recordHistory({ opportunityId: id, changeType: 'stage', from: opp.stage, to: stage, userId: req.user.id });
@@ -386,8 +435,9 @@ router.put('/:id', requireCrmWriter, async (req, res) => {
     if (!isOpen(opp.stage)) throw new HttpError(409, 'Closed opportunities cannot be edited. Reopen it first.');
     const currentProducts = opp.products.map((p) => p.id);
     const currentSegments = opp.segments.map((s) => s.id);
-    // Changing the OEM clears the products unless new ones were chosen.
-    const oemChanged = req.body.oem_id !== undefined && Number(req.body.oem_id) !== opp.oem_id;
+    const currentOems = opp.oems.map((o) => o.id);
+    // Changing the OEMs drops the products of any OEM taken off, unless new products were chosen.
+    const requestedOems = req.body.oem_ids ?? (req.body.oem_id !== undefined ? [Number(req.body.oem_id)] : null);
     const merged = {
       title: opp.title,
       estimated_value: opp.estimated_value,
@@ -396,23 +446,26 @@ router.put('/:id', requireCrmWriter, async (req, res) => {
       probability_reason: opp.probability_reason,
       tender: opp.tender,
       notes: opp.notes,
-      oem_id: opp.oem_id,
-      product_ids: oemChanged ? [] : currentProducts,
+      competitor: opp.competitor,
+      competitor_note: opp.competitor_note,
+      oem_ids: currentOems,
+      product_ids: Array.isArray(requestedOems) ? opp.products.filter((p) => requestedOems.includes(p.oem_id)).map((p) => p.id) : currentProducts,
       segment_ids: currentSegments,
       contact_id: opp.contact_id,
       ...req.body,
     };
-    const fields = await parseDealFields(merged, { companyId: opp.company_id, keepOemId: opp.oem_id, keepProductIds: currentProducts, keepSegmentIds: currentSegments });
+    if (requestedOems) merged.oem_ids = requestedOems;
+    const fields = await parseDealFields(merged, { companyId: opp.company_id, keepOemIds: currentOems, keepProductIds: currentProducts, keepSegmentIds: currentSegments });
 
     await db.transaction(async () => {
       const contactId = await resolveDealContact(fields, opp.company_id, req.user.id);
       await db
         .prepare(
           `UPDATE opportunity SET title = ?, estimated_value = ?, expected_close_date = ?, probability = ?, probability_reason = ?, tender = ?,
-                                  notes = ?, oem_id = ?, contact_id = ?, updated_at = NOW()
+                                  notes = ?, competitor = ?, competitor_note = ?, contact_id = ?, updated_at = NOW()
            WHERE id = ?`
         )
-        .run(fields.title, fields.estimated_value, fields.expected_close_date, fields.probability, fields.probability_reason, fields.tender, fields.notes, fields.oem_id, contactId, opp.id);
+        .run(fields.title, fields.estimated_value, fields.expected_close_date, fields.probability, fields.probability_reason, fields.tender, fields.notes, fields.competitor, fields.competitor_note, contactId, opp.id);
       await replaceDealLinks(opp.id, fields);
 
       const updated = await loadVisibleOpportunity(req.user, opp.id);
@@ -424,6 +477,7 @@ router.put('/:id', requireCrmWriter, async (req, res) => {
         'Probability reason': d.probability_reason,
         Tender: d.tender ? 'Yes' : 'No',
         Comments: d.notes,
+        Competitor: d.competitor === 'other' ? d.competitor_note : COMPETITOR_NAMES[d.competitor] ?? null,
         OEM: d.oem_name,
         Products: names(d.products),
         'Market segment': names(d.segments),
@@ -465,24 +519,13 @@ router.post('/:id/stage', requireCrmWriter, async (req, res) => {
     const closing = CLOSED_STAGES.includes(stage);
     if (reopening && !isManaging(req.user)) throw new HttpError(403, 'Only a manager can reopen a closed opportunity.');
     if (reopening && closing) throw new HttpError(400, 'Reopen the opportunity to an open stage first.');
-    if (['quotation_sent', 'negotiation'].includes(stage) && opp.quotation_count === 0) {
+    if (QUOTED_STAGES.includes(stage) && opp.quotation_count === 0) {
       throw new HttpError(400, 'Record the quotation first — the office or a manager adds it on this opportunity.');
     }
 
-    let wonValue = null;
-    let lostReason = null;
-    let closeReason = null;
-    if (stage === 'won') {
-      wonValue = optionalNumber(req.body, 'won_value');
-      if (!wonValue || wonValue <= 0) throw new HttpError(400, 'Enter the won value (the order amount).');
-    }
-    if (stage === 'lost') lostReason = oneOf(req.body, 'lost_reason', LOST_REASONS);
-    if (closing) {
-      closeReason = optionalText(req.body, 'close_reason', { max: 2000 });
-      if (!closeReason) throw new HttpError(400, `Write why the opportunity is being closed as ${stage}.`);
-    }
-    // Won is certain and lost or abandoned is not going to happen. A reopened deal starts over at the
-    // default. Any other move keeps the probability the salesperson chose.
+    const { wonValue, lostReason, closeReason } = closeFields(req.body, stage);
+    // Won is certain and lost is not going to happen. A reopened deal starts over at the default.
+    // Any other move keeps the probability the salesperson chose.
     const probability = stage === 'won' ? 100 : closing ? 0 : reopening ? DEFAULT_PROBABILITY : opp.probability;
 
     await db.transaction(async () => {
@@ -506,7 +549,7 @@ router.post('/:id/stage', requireCrmWriter, async (req, res) => {
           : stage === 'won'
             ? `Won "${opp.title}" (${opp.company_name}) for ${money(wonValue)}: ${closeReason}`
             : closing
-              ? `${stage === 'lost' ? 'Lost' : 'Abandoned'} "${opp.title}" (${opp.company_name}): ${closeReason}`
+              ? `Lost "${opp.title}" (${opp.company_name}): ${closeReason}`
               : `"${opp.title}" (${opp.company_name}) moved from ${opp.stage} to ${stage}`,
         before: { stage: opp.stage, probability: opp.probability, won_value: opp.won_value, lost_reason: opp.lost_reason, close_reason: opp.close_reason },
         after: { stage, probability, won_value: wonValue, lost_reason: lostReason, close_reason: closeReason },
@@ -582,7 +625,7 @@ router.post('/:id/quotations', requireQuotationRole, async (req, res) => {
         )
         .run(opp.id, fields.quotation_number, fields.quotation_date, fields.amount, fields.status, fields.erp_quotation_id, fields.document_url, source, req.user.id);
       if (fields.status !== 'draft') {
-        await advanceIfBehind({ opportunity: opp, stage: 'quotation_sent', userId: req.user.id, note: `Quotation ${fields.quotation_number} recorded` });
+        await advanceIfBehind({ opportunity: opp, stage: 'prove', userId: req.user.id, note: `Quotation ${fields.quotation_number} recorded` });
       }
       await recordAudit({
         actorUserId: req.user.id,
@@ -622,7 +665,7 @@ quotationLinksRouter.put('/:id', requireQuotationRole, async (req, res) => {
         )
         .run(next.quotation_number, next.quotation_date, next.amount, next.status, next.erp_quotation_id, next.document_url, link.id);
       if (next.status !== 'draft') {
-        await advanceIfBehind({ opportunity: opp, stage: 'quotation_sent', userId: req.user.id, note: `Quotation ${next.quotation_number} ${next.status}` });
+        await advanceIfBehind({ opportunity: opp, stage: 'prove', userId: req.user.id, note: `Quotation ${next.quotation_number} ${next.status}` });
       }
       const pick = ({ quotation_number, quotation_date, amount, status, document_url }) => ({ quotation_number, quotation_date, amount, status, document_url });
       await recordAudit({

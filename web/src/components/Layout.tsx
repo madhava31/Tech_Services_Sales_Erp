@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { BellIcon, LogOutIcon, PlusIcon } from 'lucide-react';
 import companyLogo from '../assets/brand/technicon-logo.png';
-import { api } from '../lib/api';
 import { syncOutbox, useOutbox } from '../lib/outbox';
 import { useAuth } from '../lib/auth';
 import { canWriteCrm, roleLabel } from '../lib/roles';
 import { watchSystemTheme } from '../lib/theme';
 import ConfirmHost from './ConfirmHost';
+import UniversalSearch from './UniversalSearch';
+import NotificationPopups from './NotificationPopups';
 import { Dock } from './layout/Dock';
 import { TopNav } from './layout/TopNav';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './layout/dropdown-menu';
@@ -73,9 +74,9 @@ export default function Layout() {
     };
   }, []);
 
+  // The bell's count is kept by NotificationPopups; moving to another page checks again.
   useEffect(() => {
-    const check = () => api.notifications.list().then((n) => setUnread(n.unread)).catch(() => undefined);
-    void check();
+    window.dispatchEvent(new Event('notifications-check'));
     const cleared = () => setUnread(0);
     window.addEventListener('notifications-read', cleared);
     return () => window.removeEventListener('notifications-read', cleared);
@@ -103,6 +104,7 @@ export default function Layout() {
         <Brand />
         <TopNav role={user?.role} />
         <div className="ts-acts">
+          <UniversalSearch />
           {canLogVisit && (
             <Link to="/opportunities/new" className="ts-newq" title="New opportunity (press N)" aria-label="New opportunity">
               <PlusIcon aria-hidden="true" />
@@ -131,6 +133,7 @@ export default function Layout() {
       </header>
 
       <SyncBanner />
+      {user && <NotificationPopups onUnread={setUnread} />}
 
       {/* Keyed by path so each page plays the entrance animation. */}
       <main className="ts-main min-w-0 w-full">

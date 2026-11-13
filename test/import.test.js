@@ -153,7 +153,7 @@ test('deals from Excel: every rule applies, cells are understood, and they land 
 
   const deals = (await ravi.client.request('GET', '/api/opportunities')).body;
   const first = deals.find((d) => d.title === 'Density meter');
-  assert.equal(first.stage, 'quotation_sent');
+  assert.equal(first.stage, 'prove');
   assert.equal(first.estimated_value, 6850000);
   assert.equal(first.probability, 75);
   assert.equal(first.tender, true);
@@ -167,7 +167,7 @@ test('deals from Excel: every rule applies, cells are understood, and they land 
   assert.equal(second.estimated_value, 125000);
   assert.equal(second.probability, 50);
   assert.equal(second.contact_name, 'Ms. New', 'a new number with a name creates the contact');
-  assert.equal(second.stage, 'new_prospect');
+  assert.equal(second.stage, 'create');
   assert.equal(second.owner_name, 'Ravi');
 });
 

@@ -47,7 +47,7 @@ test('many deals: one new closing date, recorded on each; others’ deals and cl
   const a = await newDeal(ravi.client, 'A');
   const b = await newDeal(ravi.client, 'B');
   const closed = await newDeal(ravi.client, 'Closed');
-  await ravi.client.request('POST', `/api/opportunities/${closed.id}/stage`, { stage: 'abandoned', close_reason: 'Shelved' });
+  await ravi.client.request('POST', `/api/opportunities/${closed.id}/stage`, { stage: 'lost', lost_reason: 'no_requirement', close_reason: 'Shelved' });
   const others = await newDeal(priya.client, 'Priya’s');
 
   const res = await ravi.client.request('POST', '/api/opportunities/bulk', { ids: [a.id, b.id, closed.id, others.id], expected_close_date: '2099-06-30' });
@@ -70,22 +70,22 @@ test('many deals: one new closing date, recorded on each; others’ deals and cl
 test('many deals: moving stage follows the same rules; only one kind of change at a time', async () => {
   const a = await newDeal(ravi.client, 'Stage A');
   const b = await newDeal(ravi.client, 'Stage B');
-  const moved = await ravi.client.request('POST', '/api/opportunities/bulk', { ids: [a.id, b.id], stage: 'qualified' });
+  const moved = await ravi.client.request('POST', '/api/opportunities/bulk', { ids: [a.id, b.id], stage: 'qualify' });
   assert.equal(moved.body.updated, 2);
-  assert.equal((await ravi.client.request('GET', `/api/opportunities/${a.id}`)).body.history[0].to_value, 'qualified');
+  assert.equal((await ravi.client.request('GET', `/api/opportunities/${a.id}`)).body.history[0].to_value, 'qualify');
 
-  const again = await ravi.client.request('POST', '/api/opportunities/bulk', { ids: [a.id], stage: 'qualified' });
+  const again = await ravi.client.request('POST', '/api/opportunities/bulk', { ids: [a.id], stage: 'qualify' });
   assert.equal(again.body.skipped[0].reason, 'already there');
-  const noQuote = await ravi.client.request('POST', '/api/opportunities/bulk', { ids: [a.id], stage: 'quotation_sent' });
+  const noQuote = await ravi.client.request('POST', '/api/opportunities/bulk', { ids: [a.id], stage: 'prove' });
   assert.equal(noQuote.body.updated, 0);
   assert.match(noQuote.body.skipped[0].reason, /quotation/);
 
   assert.equal((await ravi.client.request('POST', '/api/opportunities/bulk', { ids: [a.id], stage: 'won' })).status, 400, 'closing needs each deal’s own reason and value');
   assert.equal((await ravi.client.request('POST', '/api/opportunities/bulk', { ids: [a.id] })).status, 400);
-  assert.equal((await ravi.client.request('POST', '/api/opportunities/bulk', { ids: [a.id], stage: 'qualified', expected_close_date: '2099-01-01' })).status, 400);
-  assert.equal((await ravi.client.request('POST', '/api/opportunities/bulk', { ids: [], stage: 'qualified' })).status, 400);
-  assert.equal((await ravi.client.request('POST', '/api/opportunities/bulk', { ids: Array.from({ length: 201 }, (_, i) => i + 1), stage: 'qualified' })).status, 400);
-  assert.equal((await office.request('POST', '/api/opportunities/bulk', { ids: [a.id], stage: 'qualified' })).status, 403);
+  assert.equal((await ravi.client.request('POST', '/api/opportunities/bulk', { ids: [a.id], stage: 'qualify', expected_close_date: '2099-01-01' })).status, 400);
+  assert.equal((await ravi.client.request('POST', '/api/opportunities/bulk', { ids: [], stage: 'qualify' })).status, 400);
+  assert.equal((await ravi.client.request('POST', '/api/opportunities/bulk', { ids: Array.from({ length: 201 }, (_, i) => i + 1), stage: 'qualify' })).status, 400);
+  assert.equal((await office.request('POST', '/api/opportunities/bulk', { ids: [a.id], stage: 'qualify' })).status, 403);
 });
 
 test('many deals: transfer is for managers, needs a reason, and is audited per deal', async () => {

@@ -4,6 +4,7 @@ import { PlusIcon } from 'lucide-react';
 import { api, CompanySummary } from '../../lib/api';
 import CompanyPicker from '../../components/CompanyPicker';
 import DealFields, { DealDraft, EMPTY_DEAL_DRAFT, dealDraftComplete, draftToInput } from '../../components/DealFields';
+import OwnerField, { useOwnerChoice } from '../../components/OwnerField';
 import { Button, Card, CardHeader, Notice, PageHeader } from '../../components/ui';
 
 // Each opportunity on the form, with a key so React keeps its fields apart when one is removed.
@@ -26,6 +27,7 @@ export default function NewOpportunity() {
   const [entries, setEntries] = useState<Entry[]>(() => [newEntry()]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const owner = useOwnerChoice();
 
   useEffect(() => {
     if (companyId) api.companies.get(companyId).then(setCompany).catch(() => undefined);
@@ -47,7 +49,11 @@ export default function NewOpportunity() {
     // One at a time, so a failure leaves the ones already saved saved, and only the rest on the form.
     for (const entry of entries) {
       try {
-        const deal = await api.opportunities.create({ company_id: company.id, ...draftToInput(entry.draft) });
+        const deal = await api.opportunities.create({
+          company_id: company.id,
+          ...draftToInput(entry.draft),
+          ...(owner.chooses && owner.ownerId ? { owner_salesperson_id: Number(owner.ownerId) } : {}),
+        });
         created.push(deal.id);
         setEntries((list) => (list.length > 1 ? list.filter((x) => x.key !== entry.key) : list));
       } catch (err) {
@@ -87,6 +93,7 @@ export default function NewOpportunity() {
                 </Notice>
               ) : (
                 <>
+                  {owner.chooses && <OwnerField value={owner.ownerId} onChange={owner.setOwnerId} />}
                   {entries.map((entry, i) => (
                     <section key={entry.key} className={i > 0 ? 'pt-4 border-t border-dashed border-line' : ''} aria-label={`Opportunity ${i + 1}`}>
                       <div className="flex items-center justify-between gap-3 mb-3">
@@ -97,7 +104,7 @@ export default function NewOpportunity() {
                           </Button>
                         )}
                       </div>
-                      <DealFields companyId={company.id} value={entry.draft} onChange={(patch) => update(entry.key, patch)} />
+                      <DealFields companyId={company.id} value={entry.draft} onChange={(patch) => update(entry.key, patch)} withStage />
                     </section>
                   ))}
                   <div>
@@ -108,14 +115,15 @@ export default function NewOpportunity() {
                 </>
               )}
               <div className="flex flex-wrap gap-2 pt-1">
-                <Button type="submit" disabled={busy || !approved || !allComplete}>
-                  {busy ? 'Saving…' : entries.length > 1 ? `Open ${entries.length} opportunities` : 'Open opportunity'}
+                <Button type="submit" disabled={busy || !approved || !allComplete || !owner.ready}>
+                  {busy ? 'Saving…' : entries.length > 1 ? `Save ${entries.length} opportunities` : entries[0].draft.stage === 'closed' ? 'Save opportunity' : 'Open opportunity'}
                 </Button>
                 <Button variant="ghost" onClick={cancel}>
                   Cancel
                 </Button>
               </div>
-              {approved && !allComplete && <p className="text-xs text-subtle">Fill in the name, OEM, products, value and closing date of each opportunity to save.</p>}
+              {approved && !owner.ready && <p className="text-xs text-subtle">Choose the salesperson these opportunities belong to.</p>}
+              {approved && !allComplete && <p className="text-xs text-subtle">Fill in the name, OEM, products, value and closing date of each opportunity, and what its stage and competitor need, to save.</p>}
             </form>
           )}
           {!company && (

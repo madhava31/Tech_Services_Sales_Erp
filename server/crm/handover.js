@@ -17,7 +17,7 @@ export async function transferDeals({ fromId, toId, opportunityIds, reason, user
   const deals = await db
     .prepare(
       `SELECT id, title FROM opportunity
-       WHERE owner_salesperson_id = ? AND stage NOT IN ('won', 'lost', 'abandoned')
+       WHERE owner_salesperson_id = ? AND stage NOT IN ('won', 'lost')
          ${opportunityIds ? 'AND id = ANY(?::int[])' : ''}
        ORDER BY id FOR UPDATE`
     )

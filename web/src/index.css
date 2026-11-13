@@ -323,3 +323,9 @@ select:focus {
     inset: -12px -6px;
   }
 }
+
+/* The facts at the top of an opportunity: a label over each value, as the details card below does.
+   dl/dt/dd here, so the details card's span/b rules are restated for them. */
+.ts-deal-facts { margin: 0; }
+.ts-deal-facts dt { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: rgb(var(--muted)); margin-bottom: 3px; }
+.ts-deal-facts dd { margin: 0; font-size: 15px; min-width: 0; overflow-wrap: anywhere; }

@@ -8,6 +8,7 @@ import { useLoad } from '../../lib/useLoad';
 import { OUTCOME_LABELS, STAGE_LABELS, TASK_TYPE_LABELS, URGENCY_LABELS, dueLabel, formatDate, formatDateTime, formatMoney, whatsappLink } from '../../lib/labels';
 import ContactLogCard from '../../components/ContactLogCard';
 import DealFields, { DealDraft, EMPTY_DEAL_DRAFT, dealDraftComplete, draftToInput } from '../../components/DealFields';
+import OwnerField, { useOwnerChoice } from '../../components/OwnerField';
 import { canWriteCrm, isManagingRole } from '../../lib/roles';
 import { Badge, Button, Card, CardHeader, EmptyState, Notice, OverdueBadge, TextField, LoadingCard } from '../../components/ui';
 
@@ -110,6 +111,7 @@ function CompanyPage({ id }: { id: number }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const c = company.data;
+  const owner = useOwnerChoice();
 
   async function saveDeal(e: React.FormEvent) {
     e.preventDefault();
@@ -120,6 +122,7 @@ function CompanyPage({ id }: { id: number }) {
       await api.opportunities.create({
         company_id: c.id,
         ...draftToInput(dealForm),
+        ...(owner.chooses && owner.ownerId ? { owner_salesperson_id: Number(owner.ownerId) } : {}),
       });
       setCreatingDeal(false);
       setDealForm(EMPTY_DEAL_DRAFT);
@@ -362,9 +365,10 @@ function CompanyPage({ id }: { id: number }) {
           <form onSubmit={saveDeal} className="p-4 sm:p-5 border-b border-dashed border-line flex flex-col gap-4">
             <h4 className="text-base font-medium">New opportunity for {c.name}</h4>
             {dealError && <Notice tone="error">{dealError}</Notice>}
-            <DealFields companyId={c.id} value={dealForm} onChange={(patch) => setDealForm({ ...dealForm, ...patch })} />
+            {owner.chooses && <OwnerField value={owner.ownerId} onChange={owner.setOwnerId} />}
+            <DealFields companyId={c.id} value={dealForm} onChange={(patch) => setDealForm({ ...dealForm, ...patch })} withStage />
             <div className="flex gap-2">
-              <Button type="submit" size="sm" disabled={dealBusy || !dealDraftComplete(dealForm)}>
+              <Button type="submit" size="sm" disabled={dealBusy || !owner.ready || !dealDraftComplete(dealForm)}>
                 Open opportunity
               </Button>
               <Button
@@ -391,11 +395,11 @@ function CompanyPage({ id }: { id: number }) {
                 <span className="min-w-0">
                   <span className="block text-sm font-medium truncate">{o.title}</span>
                   <span className="block text-xs text-ink-muted">
-                    {o.owner_name} · {formatMoney(o.won_value ?? o.estimated_value, { compact: true })}
+                    <span className="tabular-nums">{o.code}</span> · {o.owner_name} · {formatMoney(o.won_value ?? o.estimated_value, { compact: true })}
                   </span>
                 </span>
                 <span className="flex flex-col items-end gap-1 shrink-0">
-                  <Badge tone={o.stage === 'won' ? 'ok' : o.stage === 'lost' || o.stage === 'abandoned' ? 'muted' : 'brand'}>{STAGE_LABELS[o.stage]}</Badge>
+                  <Badge tone={o.stage === 'won' ? 'ok' : o.stage === 'lost' ? 'muted' : 'brand'}>{STAGE_LABELS[o.stage]}</Badge>
                   {o.is_overdue && <OverdueBadge />}
                 </span>
               </Link>

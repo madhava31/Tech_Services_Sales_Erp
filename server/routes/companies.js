@@ -6,6 +6,7 @@ import { HttpError, isManaging, requireCrmWriter, scopeFilter, sendError } from 
 import { assertValidParent, mergeCompanies } from '../crm/companies.js';
 import { contactFields, findContactByPhone, insertContact, phoneTakenMessage, addContactPerson } from '../crm/contacts.js';
 import { TODAY_SQL, optionalEmail, optionalId, optionalText, requiredText } from '../crm/fields.js';
+import { addNotifications, approverIds, markHandled, personName, pushNotifications } from '../crm/notify.js';
 
 // Mounted at /api/companies (signed-in users). The registry itself is shared — everyone must be
 // able to find an existing company — but the visits, tasks and requirements shown on a company
@@ -177,8 +178,8 @@ router.get('/:id', async (req, res) => {
     const branches = await db
       .prepare(
         `SELECT b.id, b.name, b.city, b.approval_status,
-                (SELECT COUNT(*)::int FROM opportunity o WHERE o.company_id = b.id AND o.stage NOT IN ('won', 'lost', 'abandoned')${branchScope}) AS open_deals,
-                (SELECT COALESCE(SUM(o.estimated_value), 0)::float FROM opportunity o WHERE o.company_id = b.id AND o.stage NOT IN ('won', 'lost', 'abandoned')${branchScope}) AS pipeline_value
+                (SELECT COUNT(*)::int FROM opportunity o WHERE o.company_id = b.id AND o.stage NOT IN ('won', 'lost')${branchScope}) AS open_deals,
+                (SELECT COALESCE(SUM(o.estimated_value), 0)::float FROM opportunity o WHERE o.company_id = b.id AND o.stage NOT IN ('won', 'lost')${branchScope}) AS pipeline_value
          FROM company b WHERE b.parent_company_id = ? AND b.archived_at IS NULL AND b.approval_status <> 'rejected' ORDER BY b.city, b.name`
       )
       .all(...branchParams, ...branchParams, id);
@@ -230,12 +231,12 @@ router.get('/:id', async (req, res) => {
     const oppScope = scopeFilter(req.user, 'o.owner_salesperson_id', oppParams);
     const opportunities = await db
       .prepare(
-        `SELECT o.id, o.title, o.stage, o.estimated_value, o.won_value, o.expected_close_date, o.closed_at, sp.name AS owner_name,
-                (o.stage NOT IN ('won', 'lost', 'abandoned') AND o.expected_close_date < ${TODAY_SQL}) AS is_overdue
+        `SELECT o.id, o.code, o.title, o.stage, o.estimated_value, o.won_value, o.expected_close_date, o.closed_at, sp.name AS owner_name,
+                (o.stage NOT IN ('won', 'lost') AND o.expected_close_date < ${TODAY_SQL}) AS is_overdue
          FROM opportunity o JOIN salesperson sp ON sp.id = o.owner_salesperson_id
          WHERE o.company_id = ?${oppScope}
-         ORDER BY (o.stage NOT IN ('won', 'lost', 'abandoned') AND o.expected_close_date < ${TODAY_SQL}) DESC,
-                  (o.stage NOT IN ('won', 'lost', 'abandoned')) DESC, o.updated_at DESC`
+         ORDER BY (o.stage NOT IN ('won', 'lost') AND o.expected_close_date < ${TODAY_SQL}) DESC,
+                  (o.stage NOT IN ('won', 'lost')) DESC, o.updated_at DESC`
       )
       .all(...oppParams);
 
@@ -277,6 +278,7 @@ router.post('/', requireCrmWriter, async (req, res) => {
     // A manager's own entry needs no second opinion.
     const approved = isManaging(req.user);
 
+    const toPush = [];
     const created = await db.transaction(async () => {
       const info = await db
         .prepare(
@@ -299,9 +301,35 @@ router.post('/', requireCrmWriter, async (req, res) => {
         summary: `Registered company ${fields.name}${fields.city ? ` (${fields.city})` : ''}${duplicates.length ? ' after confirming it is not a duplicate' : ''}${approved ? '' : ', waiting for approval'}`,
         after: { ...fields, contact },
       });
+      if (!approved) {
+        // The salesperson hears it was sent; everyone who can approve hears who is asking.
+        const place = `${fields.name}${fields.city ? ` (${fields.city})` : ''}`;
+        const asker = await personName(req.user.id);
+        toPush.push(
+          ...(await addNotifications({
+            userIds: [req.user.id],
+            kind: 'approval_sent',
+            title: 'Sent for approval',
+            body: `${place} is waiting for a manager’s approval. You’ll be told when it is approved or rejected.`,
+            url: `/companies/${companyId}`,
+            refType: 'company',
+            refId: companyId,
+          })),
+          ...(await addNotifications({
+            userIds: await approverIds(req.user.id),
+            kind: 'approval_request',
+            title: 'Company waiting for approval',
+            body: `${asker} is asking for approval of ${place}.`,
+            url: '/approvals',
+            refType: 'company',
+            refId: companyId,
+          }))
+        );
+      }
       const row = await db.prepare(`SELECT * FROM company WHERE id = ?`).get(companyId);
       return { ...row, primary_contact_id: contactId };
     });
+    await pushNotifications(toPush);
     res.status(201).json(created);
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: err.constraint === 'company_contact_phone_unique' ? 'That phone number already belongs to another contact.' : 'A company with this name already exists.' });
@@ -314,10 +342,11 @@ async function decide(req, res, status) {
   try {
     if (!isManaging(req.user)) throw new HttpError(403, 'Only a manager can approve companies.');
     const id = Number(req.params.id);
-    const company = await db.prepare(`SELECT id, name, approval_status FROM company WHERE id = ? AND archived_at IS NULL`).get(id);
+    const company = await db.prepare(`SELECT id, name, city, approval_status, created_by FROM company WHERE id = ? AND archived_at IS NULL`).get(id);
     if (!company) throw new HttpError(404, 'Company not found');
     if (company.approval_status !== 'pending') throw new HttpError(409, `${company.name} is already ${company.approval_status}.`);
     const reason = status === 'rejected' ? requiredText(req.body, 'reason', { max: 500 }) : null;
+    let toPush = [];
     const updated = await db.transaction(async () => {
       await db
         .prepare(`UPDATE company SET approval_status = ?, approved_by = ?, approved_at = NOW(), rejection_reason = ?, updated_at = NOW() WHERE id = ?`)
@@ -331,8 +360,24 @@ async function decide(req, res, status) {
         before: { approval_status: company.approval_status },
         after: { approval_status: status, rejection_reason: reason },
       });
+      // The salesperson who asked is told the answer; the other approvers' requests are done.
+      await markHandled('company', id);
+      const place = `${company.name}${company.city ? ` (${company.city})` : ''}`;
+      const decider = await personName(req.user.id);
+      toPush = company.created_by && company.created_by !== req.user.id
+        ? await addNotifications({
+            userIds: [company.created_by],
+            kind: 'approval_decided',
+            title: status === 'approved' ? `Approved: ${company.name}` : `Rejected: ${company.name}`,
+            body: status === 'approved' ? `${decider} approved ${place}. You can open opportunities on it now.` : `${decider} rejected ${place}: ${reason}`,
+            url: `/companies/${id}`,
+            refType: 'company',
+            refId: id,
+          })
+        : [];
       return db.prepare(`SELECT * FROM company WHERE id = ?`).get(id);
     });
+    await pushNotifications(toPush);
     res.json(updated);
   } catch (err) {
     sendError(res, err);

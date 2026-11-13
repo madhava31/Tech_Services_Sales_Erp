@@ -3,10 +3,10 @@ import { api, Salesperson, SalespersonInput } from '../../lib/api';
 import { useLoad } from '../../lib/useLoad';
 import { Badge, Button, Card, CardHeader, EmptyState, Notice, PageHeader, TextField } from '../../components/ui';
 
-const EMPTY: SalespersonInput = { employee_code: '', name: '', phone: '', email: '', erp_sales_engineer_id: null };
+const EMPTY: SalespersonInput = { employee_code: '', name: '', phone: '', email: '', erp_sales_engineer_id: null, id_prefix: '' };
 
 function toInput(s: Salesperson): SalespersonInput {
-  return { employee_code: s.employee_code, name: s.name, phone: s.phone ?? '', email: s.email ?? '', erp_sales_engineer_id: s.erp_sales_engineer_id };
+  return { employee_code: s.employee_code, name: s.name, phone: s.phone ?? '', email: s.email ?? '', erp_sales_engineer_id: s.erp_sales_engineer_id, id_prefix: s.id_prefix };
 }
 
 function SalespersonFields({ value, onChange }: { value: SalespersonInput; onChange: (v: SalespersonInput) => void }) {
@@ -14,6 +14,13 @@ function SalespersonFields({ value, onChange }: { value: SalespersonInput; onCha
     <>
       <TextField label="Name" value={value.name} onChange={(e) => onChange({ ...value, name: e.target.value })} />
       <TextField label="Employee code" value={value.employee_code} onChange={(e) => onChange({ ...value, employee_code: e.target.value })} />
+      <TextField
+        label="ID letters"
+        value={value.id_prefix ?? ''}
+        onChange={(e) => onChange({ ...value, id_prefix: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4) })}
+        placeholder="From the name"
+        hint={`Their opportunity IDs: TS-${value.id_prefix || (value.name.trim()[0] ?? 'G').toUpperCase()}-0001. Left empty, it comes from the name. A change applies to new opportunities only.`}
+      />
       <TextField label="Phone" type="tel" inputMode="tel" value={value.phone ?? ''} onChange={(e) => onChange({ ...value, phone: e.target.value })} />
       <TextField label="Email" type="email" inputMode="email" value={value.email ?? ''} onChange={(e) => onChange({ ...value, email: e.target.value })} />
       <TextField
@@ -93,6 +100,7 @@ export default function Salespeople() {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className={`font-medium ${s.is_active ? '' : 'text-subtle'}`}>{s.name}</span>
                       <Badge>{s.employee_code}</Badge>
+                      <Badge tone="brand">TS-{s.id_prefix}</Badge>
                       {s.is_active ? <Badge tone="ok">Active</Badge> : <Badge tone="muted">Inactive</Badge>}
                     </div>
                     <div className="text-xs text-ink-muted mt-1 flex flex-wrap gap-x-4 gap-y-0.5">

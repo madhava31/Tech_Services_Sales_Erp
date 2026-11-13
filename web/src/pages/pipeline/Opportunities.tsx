@@ -11,11 +11,10 @@ const VIEWS: [Status, string][] = [
   ['open', 'Open'],
   ['won', 'Won'],
   ['lost', 'Lost'],
-  ['abandoned', 'Abandoned'],
 ];
 
 function StageBadge({ deal }: { deal: Opportunity }) {
-  return <Badge tone={deal.stage === 'won' ? 'ok' : deal.stage === 'lost' || deal.stage === 'abandoned' ? 'muted' : 'brand'}>{STAGE_LABELS[deal.stage]}</Badge>;
+  return <Badge tone={deal.stage === 'won' ? 'ok' : deal.stage === 'lost' ? 'muted' : 'brand'}>{STAGE_LABELS[deal.stage]}</Badge>;
 }
 
 const value = (d: Opportunity) => formatMoney(d.won_value ?? d.estimated_value, { compact: true });
@@ -41,7 +40,11 @@ export default function Opportunities() {
   const shown = useMemo(() => {
     const term = q.trim().toLowerCase();
     if (!rows || !term) return rows ?? [];
-    return rows.filter((d) => [d.title, d.company_name, d.owner_name, d.oem_name].some((v) => (v ?? '').toLowerCase().includes(term)));
+    // The ID matches with or without its dashes: "tsg12" finds TS-G-0012.
+    const compact = term.replace(/[^a-z0-9]/g, '');
+    return rows.filter(
+      (d) => [d.title, d.company_name, d.owner_name, d.oem_name, d.code].some((v) => (v ?? '').toLowerCase().includes(term)) || (compact.length >= 2 && d.code.toLowerCase().replace(/-/g, '').includes(compact))
+    );
   }, [rows, q]);
 
   return (
@@ -67,7 +70,7 @@ export default function Opportunities() {
               </button>
             ))}
           </div>
-          <SearchBox label="Search opportunities" placeholder="Name, company or owner" value={q} onChange={(e) => setQ(e.target.value)} />
+          <SearchBox label="Search opportunities" placeholder="ID, name, company or owner" value={q} onChange={(e) => setQ(e.target.value)} />
           {rows && (
             <span className="ts-showing ts-muted">
               Showing {shown.length} of {rows.length}
@@ -82,6 +85,7 @@ export default function Opportunities() {
               <table>
                 <thead>
                   <tr>
+                    <th>ID</th>
                     <th>Opportunity</th>
                     <th>Company</th>
                     <th>Stage</th>
@@ -93,6 +97,7 @@ export default function Opportunities() {
                 <tbody>
                   {shown.map((d, i) => (
                     <tr key={d.id} style={rowStagger(i)}>
+                      <td className="ts-muted tabular-nums whitespace-nowrap">{d.code}</td>
                       <td className="ts-wrap">
                         <Link to={`/pipeline/${d.id}`} className="ts-lnk font-medium">
                           {d.title}
@@ -122,7 +127,7 @@ export default function Opportunities() {
                   <div className="min-w-0">
                     <div className="ts-nm !whitespace-normal">{d.title}</div>
                     <div className="ts-sub truncate">
-                      {d.company_name}
+                      <span className="tabular-nums">{d.code}</span> · {d.company_name}
                       {teamView && ` · ${d.owner_name}`}
                       {view === 'open' && d.expected_close_date && ` · ${formatDate(d.expected_close_date)}`}
                     </div>

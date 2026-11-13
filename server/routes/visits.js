@@ -236,9 +236,9 @@ router.post('/:id/complete', requireCrmWriter, async (req, res) => {
 // meeting, not interested) link the visit without moving the stage — marking a deal lost is a
 // deliberate action on the deal itself.
 const OUTCOME_STAGE = {
-  interested: 'qualified',
-  follow_up_needed: 'visit_completed',
-  quotation_requested: 'quotation_requested',
+  interested: 'qualify',
+  follow_up_needed: 'qualify',
+  quotation_requested: 'develop',
 };
 
 // `opportunity: { id }` links an existing open deal of this company; `opportunity: { title, ... }`

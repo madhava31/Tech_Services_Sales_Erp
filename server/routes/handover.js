@@ -33,7 +33,7 @@ router.get('/preview', async (req, res) => {
                 (o.expected_close_date < ${TODAY_SQL}) AS is_overdue, ${STUCK_SQL} AS is_stuck,
                 (SELECT COUNT(*)::int FROM task t WHERE t.opportunity_id = o.id AND t.status = 'open' AND t.assignee_salesperson_id = o.owner_salesperson_id) AS open_tasks
          FROM opportunity o JOIN company c ON c.id = o.company_id
-         WHERE o.owner_salesperson_id = ? AND o.stage NOT IN ('won', 'lost', 'abandoned')
+         WHERE o.owner_salesperson_id = ? AND o.stage NOT IN ('won', 'lost')
          ORDER BY o.estimated_value DESC NULLS LAST, o.id`
       )
       .all(fromId);

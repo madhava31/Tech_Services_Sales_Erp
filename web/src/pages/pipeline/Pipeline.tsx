@@ -5,13 +5,15 @@ import { useAuth } from '../../lib/auth';
 import { LOST_REASON_LABELS, OPEN_STAGES, STAGE_LABELS, formatDate, formatMoney } from '../../lib/labels';
 import { canWriteCrm, isManagingRole } from '../../lib/roles';
 import BulkBar, { bulkMessage } from '../../components/BulkBar';
+import ExportPanel from '../../components/ExportPanel';
 import { Badge, Button, Card, EmptyState, Notice, OverdueBadge, PHONE_TOUCH, PageHeader, SelectField, SkeletonRows, StuckBadge, TextField, stagger } from '../../components/ui';
 
-type View = 'open' | 'won' | 'lost' | 'abandoned';
+type View = 'open' | 'won' | 'lost';
 
 function DealCard({ deal, teamView, selected, onToggle }: { deal: Opportunity; teamView: boolean; selected?: boolean; onToggle?: () => void }) {
   const body = (
     <>
+      <div className="text-[11px] text-subtle tabular-nums tracking-wide mb-0.5">{deal.code}</div>
       <h5 className="!mt-0 !mb-1 !whitespace-normal">{deal.title}</h5>
       <div className="text-xs text-subtle truncate">{deal.company_name}</div>
       <div className="ts-kmeta items-center mt-2.5">
@@ -62,6 +64,7 @@ export default function Pipeline() {
   const [people, setPeople] = useState<{ id: number; name: string }[]>([]);
   const [notice, setNotice] = useState('');
   const [selecting, setSelecting] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [newDate, setNewDate] = useState('');
   const [newStage, setNewStage] = useState<Stage | ''>('');
@@ -144,7 +147,7 @@ export default function Pipeline() {
 
       <div className="ts-toolbar !mb-0">
         <div className="ts-tabs" role="tablist">
-        {(['open', 'won', 'lost', 'abandoned'] as View[]).map((v) => (
+        {(['open', 'won', 'lost'] as View[]).map((v) => (
           <button
             key={v}
             type="button"
@@ -153,7 +156,7 @@ export default function Pipeline() {
             onClick={() => setView(v)}
             className={`ts-tab ${PHONE_TOUCH} ${view === v ? 'ts-on' : ''}`}
           >
-            {v === 'open' ? 'Open' : v === 'won' ? 'Won' : v === 'lost' ? 'Lost' : 'Abandoned'}
+            {v === 'open' ? 'Open' : v === 'won' ? 'Won' : 'Lost'}
           </button>
         ))}
         </div>
@@ -212,19 +215,19 @@ export default function Pipeline() {
           </select>
         )}
         <span className="flex-1" />
-        <a
-          href={api.opportunities.exportUrl(filters)}
-          download
-          className="ts-btn ts-ghost justify-center max-[860px]:min-h-11"
-        >
-          Download Excel
-        </a>
+        {user?.role === 'admin' && (
+          <Button variant="ghost" onClick={() => setExporting((x) => !x)} aria-expanded={exporting}>
+            Download Excel
+          </Button>
+        )}
         {canWriteCrm(user?.role) && view === 'open' && !selecting && (deals?.length ?? 0) > 1 && (
           <Button variant="secondary" onClick={() => setSelecting(true)}>
             Select several
           </Button>
         )}
       </div>
+
+      {exporting && <ExportPanel filters={filters} onClose={() => setExporting(false)} />}
 
       {deals === null && !error && (
         <Card>

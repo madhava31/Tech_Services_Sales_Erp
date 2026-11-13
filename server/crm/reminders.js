@@ -44,7 +44,7 @@ async function sendPush(subscription, payload) {
 }
 
 // One message to each of a person's phones, for anything other than the daily digest.
-async function pushToUser(userId, payload) {
+export async function pushToUser(userId, payload) {
   if (!configurePush()) return;
   for (const subscription of await db.prepare(`SELECT * FROM push_subscription WHERE user_id = ?`).all(userId)) {
     await sendPush(subscription, payload).catch(async (err) => {
@@ -74,13 +74,13 @@ async function digestsForToday() {
       `SELECT u.id AS user_id, u.role,
               (SELECT COUNT(*)::int FROM task t WHERE t.status = 'open' AND t.due_date = ${TODAY_SQL} AND t.assignee_salesperson_id = u.salesperson_id) AS due_today,
               (SELECT COUNT(*)::int FROM task t WHERE t.status = 'open' AND t.due_date < ${TODAY_SQL} AND t.assignee_salesperson_id = u.salesperson_id) AS overdue_tasks,
-              (SELECT COUNT(*)::int FROM opportunity o WHERE o.stage NOT IN ('won', 'lost', 'abandoned') AND o.expected_close_date < ${TODAY_SQL} AND o.owner_salesperson_id = u.salesperson_id) AS overdue_deals,
+              (SELECT COUNT(*)::int FROM opportunity o WHERE o.stage NOT IN ('won', 'lost') AND o.expected_close_date < ${TODAY_SQL} AND o.owner_salesperson_id = u.salesperson_id) AS overdue_deals,
               (SELECT COUNT(*)::int FROM opportunity o WHERE ${STUCK_SQL} AND o.owner_salesperson_id = u.salesperson_id) AS stuck_deals,
               (SELECT COUNT(*)::int FROM opportunity o WHERE ${STUCK_SQL}) AS team_stuck_deals,
               (SELECT COUNT(*)::int FROM tender tn JOIN opportunity o ON o.id = tn.opportunity_id WHERE o.tender AND o.closed_at IS NULL AND tn.bid_status = 'preparing' AND tn.bid_due_date <= ${TODAY_SQL} + 3 AND o.owner_salesperson_id = u.salesperson_id) AS tenders_due,
               (SELECT COUNT(*)::int FROM tender tn JOIN opportunity o ON o.id = tn.opportunity_id WHERE o.tender AND o.closed_at IS NULL AND tn.bid_status = 'preparing' AND tn.bid_due_date <= ${TODAY_SQL} + 3) AS team_tenders_due,
               (SELECT COUNT(*)::int FROM task t WHERE t.status = 'open' AND t.due_date < ${TODAY_SQL}) AS team_overdue_tasks,
-              (SELECT COUNT(*)::int FROM opportunity o WHERE o.stage NOT IN ('won', 'lost', 'abandoned') AND o.expected_close_date < ${TODAY_SQL}) AS team_overdue_deals
+              (SELECT COUNT(*)::int FROM opportunity o WHERE o.stage NOT IN ('won', 'lost') AND o.expected_close_date < ${TODAY_SQL}) AS team_overdue_deals
        FROM app_user u WHERE u.is_active AND u.role <> 'office_staff'`
     )
     .all();
@@ -109,7 +109,7 @@ export async function runDailyReminders({ send = sendPush } = {}) {
     const row = await db
       .prepare(
         `INSERT INTO notification (user_id, kind, for_date, title, body, url) VALUES (?, 'daily_digest', ?, ?, ?, ?)
-         ON CONFLICT (user_id, kind, for_date) DO NOTHING RETURNING id`
+         ON CONFLICT (user_id, kind, for_date) WHERE kind IN ('daily_digest', 'weekly_report') DO NOTHING RETURNING id`
       )
       .get(digest.userId, today, digest.title, digest.body, digest.url);
     if (!row) continue;
