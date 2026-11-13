@@ -21,7 +21,7 @@ const ago = (days) => `(NOW() - make_interval(days => ${days}))`;
 // path: [[stage, daysAgo], ...], oldest first; the last entry is its stage now.
 async function deal(owner, { path, value = 100000, probability = 25, close = null, title = 'Deal' }) {
   const stage = path[path.length - 1][0];
-  const closed = ['won', 'lost', 'abandoned'].includes(stage);
+  const closed = ['won', 'lost'].includes(stage);
   const [{ id }] = await query(
     `INSERT INTO opportunity (company_id, title, owner_salesperson_id, original_owner_salesperson_id, stage, estimated_value, probability, expected_close_date,
                               won_value, lost_reason, close_reason, closed_at, created_by, created_at)
@@ -66,10 +66,10 @@ after(async () => {
 });
 
 test('stuck: past the limit for its current stage; a stage change restarts the clock, an edit does not', async () => {
-  // Quote requested allows 7 days by default; negotiation allows 30.
-  const stuck = await deal(priya, { path: [['new_prospect', 40], ['quotation_requested', 10]], title: 'Stuck deal' });
-  const fine = await deal(priya, { path: [['new_prospect', 40], ['negotiation', 10]], title: 'Within limit' });
-  const closed = await deal(priya, { path: [['new_prospect', 90], ['lost', 60]], title: 'Closed long ago' });
+  // Develop allows 7 days by default; negotiation allows 30.
+  const stuck = await deal(priya, { path: [['create', 40], ['develop', 10]], title: 'Stuck deal' });
+  const fine = await deal(priya, { path: [['create', 40], ['negotiation', 10]], title: 'Within limit' });
+  const closed = await deal(priya, { path: [['create', 90], ['lost', 60]], title: 'Closed long ago' });
 
   const get = async (id) => (await priya.client.request('GET', `/api/opportunities/${id}`)).body;
   const s = await get(stuck);
@@ -102,7 +102,7 @@ test('stuck: past the limit for its current stage; a stage change restarts the c
 
 test('the morning reminder mentions stuck deals, to the owner and to managers', async () => {
   await query(`DELETE FROM notification`);
-  await deal(priya, { path: [['qualified', 100]], title: 'Very stuck' });
+  await deal(priya, { path: [['qualify', 100]], title: 'Very stuck' });
   await runDailyReminders({ send: async () => undefined });
   const mine = (await priya.client.request('GET', '/api/notifications')).body;
   assert.match(mine.items[0].body, /1 opportunity stuck/);
@@ -112,7 +112,7 @@ test('the morning reminder mentions stuck deals, to the owner and to managers', 
 
 test('stuck limits: everyone can read them, only MD/Admin change them, and it is audited', async () => {
   const settings = (await ravi.client.request('GET', '/api/analysis/stage-settings')).body;
-  assert.deepEqual(settings.map((s) => s.stage), ['new_prospect', 'visit_completed', 'qualified', 'quotation_requested', 'quotation_sent', 'negotiation']);
+  assert.deepEqual(settings.map((s) => s.stage), ['create', 'qualify', 'develop', 'prove', 'negotiation']);
   for (const client of [ravi.client, manager, office]) {
     assert.equal((await client.request('PUT', '/api/analysis/stage-settings/negotiation', { stuck_after_days: 5 })).status, 403);
   }
@@ -131,31 +131,32 @@ test('stuck limits: everyone can read them, only MD/Admin change them, and it is
 
 test('the funnel: how far deals opened in the period got, by stage', async () => {
   const rep = await signedInSalesperson(server.baseUrl, 'Funnel', createClient);
-  await deal(rep, { path: [['new_prospect', 40], ['qualified', 30], ['quotation_sent', 20], ['won', 10]], value: 500000 });
-  await deal(rep, { path: [['qualified', 40], ['lost', 20]], value: 200000 });
-  await deal(rep, { path: [['new_prospect', 30], ['negotiation', 10]], value: 300000 });
-  await deal(rep, { path: [['new_prospect', 5]], value: 100000 });
-  await deal(rep, { path: [['new_prospect', 200]], value: 999999, title: 'Outside 90 days' });
+  await deal(rep, { path: [['create', 40], ['qualify', 30], ['prove', 20], ['won', 10]], value: 500000 });
+  await deal(rep, { path: [['qualify', 40], ['lost', 20]], value: 200000 });
+  await deal(rep, { path: [['create', 30], ['negotiation', 10]], value: 300000 });
+  await deal(rep, { path: [['create', 5]], value: 100000 });
+  await deal(rep, { path: [['create', 200]], value: 999999, title: 'Outside 90 days' });
 
   const { body } = await rep.client.request('GET', '/api/analysis/funnel?days=90');
   assert.equal(body.total, 4);
   const row = (stage) => body.stages.find((s) => s.stage === stage);
-  assert.deepEqual(body.stages.map((s) => s.reached), [4, 3, 3, 2, 2, 2, 1], 'a skipped stage still counts as passed');
-  assert.equal(row('new_prospect').reached_value, 1100000);
+  assert.deepEqual(body.stages.map((s) => s.stage), ['create', 'qualify', 'develop', 'prove', 'negotiation', 'won']);
+  assert.deepEqual(body.stages.map((s) => s.reached), [4, 3, 2, 2, 2, 1], 'a skipped stage still counts as passed');
+  assert.equal(row('create').reached_value, 1100000);
   assert.equal(row('won').reached_value, 500000);
-  assert.equal(row('new_prospect').to_next_pct, 75);
-  assert.equal(row('quotation_requested').to_next_pct, 100);
+  assert.equal(row('create').to_next_pct, 75);
+  assert.equal(row('develop').to_next_pct, 100);
   assert.equal(row('negotiation').to_next_pct, 50);
   assert.equal(row('won').to_next_pct, null);
-  assert.equal(row('qualified').dropped, 1, 'lost after reaching Qualified');
-  assert.equal(body.lost_or_abandoned, 1);
+  assert.equal(row('qualify').dropped, 1, 'lost after reaching Qualify');
+  assert.equal(body.lost, 1);
   assert.equal(row('negotiation').open_now, 1);
-  assert.equal(row('new_prospect').open_now, 1);
-  // The won deal spent 10 days in Quote sent; nobody else stopped there.
-  assert.equal(row('quotation_sent').avg_days, 10);
+  assert.equal(row('create').open_now, 1);
+  // The won deal spent 10 days in Prove; nobody else stopped there.
+  assert.equal(row('prove').avg_days, 10);
 
   // The snapshot isn't limited to the period.
-  assert.equal(body.open_by_stage.find((s) => s.stage === 'new_prospect').value, 1099999);
+  assert.equal(body.open_by_stage.find((s) => s.stage === 'create').value, 1099999);
 
   const longer = (await rep.client.request('GET', '/api/analysis/funnel?days=365')).body;
   assert.equal(longer.total, 5);
@@ -176,7 +177,7 @@ test('funnel and forecast: a salesperson sees only their own; managers can narro
 
 test('the forecast: by closing month and confidence, with overdue deals kept apart', async () => {
   const rep = await signedInSalesperson(server.baseUrl, 'Forecast', createClient);
-  const open = (value, probability, close, title = 'F') => deal(rep, { path: [['qualified', 2]], value, probability, close, title });
+  const open = (value, probability, close, title = 'F') => deal(rep, { path: [['qualify', 2]], value, probability, close, title });
   await open(1000000, 100, monthsAhead(1), 'Commit 100');
   await open(800000, 75, monthsAhead(1), 'Commit 75');
   await open(400000, 50, monthsAhead(1), 'Best');
@@ -186,8 +187,8 @@ test('the forecast: by closing month and confidence, with overdue deals kept apa
   await open(600000, 50, fromToday(-3), 'Overdue');
   await open(50000, 25, null, 'No date');
   await open(70000, 25, fromToday(0), 'Due today');
-  await deal(rep, { path: [['new_prospect', 30], ['won', 0]], value: 1500000, title: 'Won this month' });
-  await deal(rep, { path: [['new_prospect', 30], ['lost', 1]], value: 7777777, close: monthsAhead(1), title: 'Lost, never forecast' });
+  await deal(rep, { path: [['create', 30], ['won', 0]], value: 1500000, title: 'Won this month' });
+  await deal(rep, { path: [['create', 30], ['lost', 1]], value: 7777777, close: monthsAhead(1), title: 'Lost, never forecast' });
 
   const { body } = await rep.client.request('GET', '/api/analysis/forecast');
   assert.equal(body.months.length, 6);

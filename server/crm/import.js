@@ -5,7 +5,7 @@ import { phoneTakenMessage, addContactPerson } from './contacts.js';
 import { parseCsvRecords } from './csv.js';
 import { assertCompanyAcceptsDeals, insertOpportunity, parseDealFields } from './deals.js';
 import { normalizeCompanyName, phoneKey } from './normalize.js';
-import { OPEN_STAGES } from './pipeline.js';
+import { OPEN_STAGES, QUOTED_STAGES } from './pipeline.js';
 
 // Bulk import for going live: companies, then contacts, then open deals. The same validation runs for
 // the preview and again for the import, so what was previewed is what happens. Rows with an error are
@@ -73,20 +73,25 @@ export const TEMPLATES = {
   },
   deals: {
     headers: ['Company', 'Opportunity', 'Salesperson', 'OEM', 'Products', 'Expected closing date', 'Order value (INR)', 'Win probability', 'Probability reason', 'Tender', 'Market segment', 'Stage', 'Phone', 'Contact', 'Comments', 'Quotation number'],
-    example: ['Example Labs Pvt Ltd', 'Example instrument', 'SE-001', 'PerkinElmer', 'Part number or product name; separate several with ;', '31/03/2027', '500000', '50', 'Budget confirmed', 'No', 'Pharma', 'Qualified', '9000000000', 'Dr. Example', '', ''],
+    example: ['Example Labs Pvt Ltd', 'Example instrument', 'SE-001', 'PerkinElmer (several: separate with ;)', 'Part number or product name; separate several with ;', '31/03/2027', '500000', '50', 'Budget confirmed', 'No', 'Pharma', 'Qualify', '9000000000', 'Dr. Example', '', ''],
   },
 };
 
+// The current stages, and the names used before 12-11-2026 so older spreadsheets still import.
 const STAGE_NAMES = {
-  'new prospect': 'new_prospect',
-  visited: 'visit_completed',
-  'visit completed': 'visit_completed',
-  qualified: 'qualified',
-  'quote requested': 'quotation_requested',
-  'quotation requested': 'quotation_requested',
-  'quote sent': 'quotation_sent',
-  'quotation sent': 'quotation_sent',
+  create: 'create',
+  qualify: 'qualify',
+  develop: 'develop',
+  prove: 'prove',
   negotiation: 'negotiation',
+  'new prospect': 'create',
+  visited: 'qualify',
+  'visit completed': 'qualify',
+  qualified: 'qualify',
+  'quote requested': 'develop',
+  'quotation requested': 'develop',
+  'quote sent': 'prove',
+  'quotation sent': 'prove',
 };
 
 const headerKey = (h) => String(h ?? '').toLowerCase().replace(/[^a-z0-9%]+/g, ' ').trim();
@@ -377,7 +382,7 @@ async function checkDeals(rows, map) {
     .prepare(`SELECT cc.id, cc.name, cc.phone, cc.company_id, c.name AS company_name FROM company_contact cc JOIN company c ON c.id = cc.company_id WHERE cc.archived_at IS NULL AND cc.phone IS NOT NULL`)
     .all();
   const contactByPhone = new Map(contacts.filter((c) => phoneKey(c.phone)).map((c) => [phoneKey(c.phone), c]));
-  const openDeals = await db.prepare(`SELECT company_id, title FROM opportunity WHERE stage NOT IN ('won', 'lost', 'abandoned')`).all();
+  const openDeals = await db.prepare(`SELECT company_id, title FROM opportunity WHERE stage NOT IN ('won', 'lost')`).all();
   const dealKeys = new Set(openDeals.map((d) => `${d.company_id}|${nameKey(d.title)}`));
 
   const results = [];
@@ -400,15 +405,24 @@ async function checkDeals(rows, map) {
     if (!person) result.errors.push(`The salesperson "${get('salesperson')}" was not found. Use their employee code or full name.`);
     else if (!person.is_active) result.errors.push(`${person.name} has left. Choose an active salesperson.`);
 
-    const oem = oems.get(nameKey(get('oem')));
-    if (!oem) result.errors.push(`The OEM "${get('oem')}" was not found.`);
+    // One OEM or several, separated like products.
+    const chosenOems = [];
+    for (const item of splitList(get('oem'))) {
+      const found = oems.get(nameKey(item));
+      if (found) chosenOems.push(found);
+      else result.errors.push(`The OEM "${item}" was not found.`);
+    }
+    if (splitList(get('oem')).length === 0) result.errors.push('OEM is empty.');
+    const oem = chosenOems.length ? chosenOems : null;
+    const oemIds = chosenOems.map((o) => o.id);
 
     const productIds = [];
     if (oem) {
+      const makes = chosenOems.map((o) => o.name).join(' or ');
       for (const item of splitList(get('products'))) {
-        const match = products.find((p) => p.oem_id === oem.id && (nameKey(p.part_number) === nameKey(item) || nameKey(p.name) === nameKey(item)));
+        const match = products.find((p) => oemIds.includes(p.oem_id) && (nameKey(p.part_number) === nameKey(item) || nameKey(p.name) === nameKey(item)));
         if (match) productIds.push(match.id);
-        else result.errors.push(`"${item}" is not an active ${oem.name} product. Use its part number or exact name.`);
+        else result.errors.push(`"${item}" is not an active ${makes} product. Use its part number or exact name.`);
       }
       if (splitList(get('products')).length === 0) result.errors.push('Products is empty.');
     }
@@ -427,13 +441,13 @@ async function checkDeals(rows, map) {
     const tender = parseYesNo(get('tender'));
     if (tender === null) result.errors.push(`Tender must be Yes or No, not "${get('tender')}".`);
 
-    let stage = 'new_prospect';
+    let stage = 'create';
     if (get('stage')) {
       stage = STAGE_NAMES[nameKey(get('stage'))] ?? get('stage');
       if (!OPEN_STAGES.includes(stage)) result.errors.push(`"${get('stage')}" is not an open stage. Import only open opportunities.`);
     }
     const quotation = get('quotation_number');
-    if (['quotation_sent', 'negotiation'].includes(stage) && !quotation) result.errors.push('An opportunity at this stage needs its quotation number.');
+    if (QUOTED_STAGES.includes(stage) && !quotation) result.errors.push('An opportunity at this stage needs its quotation number.');
 
     let contactId = null;
     let newContact;
@@ -458,7 +472,7 @@ async function checkDeals(rows, map) {
             probability_reason: get('probability_reason'),
             tender,
             notes: get('comments'),
-            oem_id: oem.id,
+            oem_ids: oemIds,
             product_ids: productIds,
             segment_ids: segmentIds,
             contact_id: contactId,

@@ -111,22 +111,23 @@ test('field changes are kept in the deal history and the audit log', async () =>
   assert.equal(audit.after['Win probability'], 50);
 });
 
-test('closing as won, lost or abandoned needs a written reason; only a manager reopens', async () => {
+test('closing as won or lost needs a written reason; only a manager reopens', async () => {
   const deal = await openDeal(ravi.client);
-  assert.equal((await ravi.client.request('POST', `/api/opportunities/${deal.id}/stage`, { stage: 'abandoned' })).status, 400);
-  const abandoned = await ravi.client.request('POST', `/api/opportunities/${deal.id}/stage`, { stage: 'abandoned', close_reason: 'Project shelved' });
-  assert.equal(abandoned.status, 200);
-  assert.equal(abandoned.body.stage, 'abandoned');
-  assert.equal(abandoned.body.close_reason, 'Project shelved');
-  assert.ok(abandoned.body.closed_at);
+  assert.equal((await ravi.client.request('POST', `/api/opportunities/${deal.id}/stage`, { stage: 'lost', lost_reason: 'no_requirement' })).status, 400);
+  assert.equal((await ravi.client.request('POST', `/api/opportunities/${deal.id}/stage`, { stage: 'abandoned', close_reason: 'x' })).status, 400, 'Abandoned is gone: it is Lost');
+  const lost = await ravi.client.request('POST', `/api/opportunities/${deal.id}/stage`, { stage: 'lost', lost_reason: 'no_requirement', close_reason: 'Project shelved' });
+  assert.equal(lost.status, 200);
+  assert.equal(lost.body.stage, 'lost');
+  assert.equal(lost.body.close_reason, 'Project shelved');
+  assert.ok(lost.body.closed_at);
   assert.equal((await ravi.client.request('PUT', `/api/opportunities/${deal.id}`, { title: 'x' })).status, 409, 'closed deals are read-only');
-  assert.equal((await ravi.client.request('POST', `/api/opportunities/${deal.id}/stage`, { stage: 'qualified' })).status, 403);
+  assert.equal((await ravi.client.request('POST', `/api/opportunities/${deal.id}/stage`, { stage: 'qualify' })).status, 403);
 
-  const reopened = await manager.request('POST', `/api/opportunities/${deal.id}/stage`, { stage: 'qualified' });
+  const reopened = await manager.request('POST', `/api/opportunities/${deal.id}/stage`, { stage: 'qualify' });
   assert.equal(reopened.status, 200);
   assert.equal(reopened.body.close_reason, null);
   const actions = (await query(`SELECT action FROM audit_log WHERE entity_type = 'opportunity' AND entity_id = $1 ORDER BY id`, [deal.id])).map((r) => r.action);
-  assert.deepEqual(actions, ['opportunity.created', 'opportunity.abandoned', 'opportunity.reopened']);
+  assert.deepEqual(actions, ['opportunity.created', 'opportunity.lost', 'opportunity.reopened']);
 
   assert.equal((await office.request('POST', `/api/opportunities/${deal.id}/stage`, { stage: 'lost', lost_reason: 'price', close_reason: 'x' })).status, 403, 'office staff cannot close deals');
 });
@@ -153,23 +154,23 @@ test('overdue: past its closing date in India time and not closed, listed first 
   // Due today is not overdue; a closed deal never is.
   await query(`UPDATE opportunity SET expected_close_date = ${IST_TODAY} WHERE id = $1`, [onTime.id]);
   assert.equal((await priya.client.request('GET', `/api/opportunities/${onTime.id}`)).body.is_overdue, false);
-  await priya.client.request('POST', `/api/opportunities/${late.id}/stage`, { stage: 'abandoned', close_reason: 'Gone quiet' });
+  await priya.client.request('POST', `/api/opportunities/${late.id}/stage`, { stage: 'lost', lost_reason: 'no_response', close_reason: 'Gone quiet' });
   assert.equal((await priya.client.request('GET', `/api/opportunities/${late.id}`)).body.is_overdue, false);
 });
 
-test('performance: weighted pipeline uses each deal’s probability; abandoned and overdue are counted', async () => {
+test('performance: weighted pipeline uses each deal’s probability; lost and overdue are counted', async () => {
   const rep = await signedInSalesperson(server.baseUrl, 'Weighted', createClient);
   await openDeal(rep.client, { estimated_value: 1000000, probability: 50 });
   const late = await openDeal(rep.client, { estimated_value: 400000, probability: 25 });
   await makeOverdue(late.id);
   const dropped = await openDeal(rep.client, { estimated_value: 9000000, probability: 100 });
-  await rep.client.request('POST', `/api/opportunities/${dropped.id}/stage`, { stage: 'abandoned', close_reason: 'Shelved' });
+  await rep.client.request('POST', `/api/opportunities/${dropped.id}/stage`, { stage: 'lost', lost_reason: 'no_requirement', close_reason: 'Shelved' });
   const m = (await rep.client.request('GET', '/api/performance')).body;
   assert.equal(m.open_deals, 2);
   assert.equal(m.pipeline_value, 1400000);
   assert.equal(m.weighted_pipeline, 600000);
   assert.equal(m.overdue_deals, 1);
-  assert.equal(m.deals_abandoned, 1);
+  assert.equal(m.deals_lost, 1);
 });
 
 test('"+ Add customer number": creates, selects an existing contact, or blocks another company’s number', async () => {
@@ -211,13 +212,13 @@ test('contact phone numbers are unique across all contacts', async () => {
 
 test('quotation requests: the queue, recording a quotation with a link, and safe links only', async () => {
   const deal = await openDeal(ravi.client);
-  await ravi.client.request('POST', `/api/opportunities/${deal.id}/stage`, { stage: 'quotation_requested' });
+  await ravi.client.request('POST', `/api/opportunities/${deal.id}/stage`, { stage: 'develop' });
   assert.ok((await office.request('GET', '/api/opportunities/quotation-requests')).body.some((d) => d.id === deal.id));
   assert.equal((await office.request('POST', `/api/opportunities/${deal.id}/quotations`, { quotation_number: 'Q-1', document_url: 'javascript:alert(1)' })).status, 400);
   const q = await office.request('POST', `/api/opportunities/${deal.id}/quotations`, { quotation_number: 'Q-1', quotation_date: '2026-11-01', amount: 480000, document_url: 'https://erp.example.com/q/1.pdf' });
   assert.equal(q.status, 201);
   assert.equal(q.body.document_url, 'https://erp.example.com/q/1.pdf');
-  assert.equal((await ravi.client.request('GET', `/api/opportunities/${deal.id}`)).body.stage, 'quotation_sent');
+  assert.equal((await ravi.client.request('GET', `/api/opportunities/${deal.id}`)).body.stage, 'prove');
   assert.equal((await office.request('GET', '/api/opportunities/quotation-requests')).body.some((d) => d.id === deal.id), false);
 });
 
@@ -233,30 +234,59 @@ async function readSheet(res) {
   return { header, rows };
 }
 
-test('Excel export: the agreed columns, current filters, and only your own deals', async () => {
+test('Excel export: Admin only, in the agreed order, one OEM column pair per OEM, and only the chosen columns', async () => {
   const rep = await signedInSalesperson(server.baseUrl, 'Exporter', createClient);
-  const late = await openDeal(rep.client, { title: 'Overdue export', estimated_value: 1000000, probability: 50, new_contact: { phone: '9000044444', name: 'Ms. Iyer' } });
+  await createUser('exportadmin', 'admin');
+  const admin = createClient(server.baseUrl);
+  await login(admin, 'exportadmin');
+  const late = await openDeal(rep.client, {
+    title: 'Overdue export',
+    estimated_value: 1000000,
+    probability: 50,
+    new_contact: { phone: '9000044444', name: 'Ms. Iyer', email: 'iyer@example.com', designation: 'QC Head', department: 'Quality' },
+  });
   await makeOverdue(late.id);
   await openDeal(rep.client, { title: 'Not overdue' });
-  const others = await openDeal(ravi.client, { title: 'Someone else’s' });
 
-  const res = await rep.client.requestRaw('GET', '/api/opportunities/export.xlsx?overdue=1');
+  for (const client of [rep.client, manager, office]) {
+    assert.equal((await client.requestRaw('GET', '/api/opportunities/export.xlsx')).status, 403, 'only Admin downloads');
+    assert.equal((await client.request('GET', '/api/opportunities/export-columns')).status, 403);
+  }
+
+  const mine = `owner_id=${rep.salespersonId}`;
+  const res = await admin.requestRaw('GET', `/api/opportunities/export.xlsx?overdue=1&${mine}`);
   assert.equal(res.status, 200);
   assert.match(res.headers.get('content-type'), /spreadsheetml/);
   const { header, rows } = await readSheet(res);
   assert.deepEqual(header, [
-    'Created date', 'Opportunity', 'Company', 'Contact', 'Phone', 'Salesperson', 'OEM', 'Products', 'Stage', 'Expected closing date', 'Win probability %',
-    'Probability reason', 'Order value (INR)', 'Weighted value', 'Tender', 'Market segment', 'Outcome', 'Overdue', 'Close reason / comments',
+    'Created date', 'Company name', 'Contact name', 'Contact number', 'Contact email', 'Designation', 'Department', 'Opportunity ID', 'Opportunity',
+    'OEM', 'Products (OEM)', 'Salesperson', 'Salesperson ID', 'Stage', 'Closing date',
+    'Win probability %', 'Probability reason', 'Order value (INR)', 'Weighted value', 'Tender', 'Market segment', 'Competitor', 'Outcome', 'Overdue', 'Close reason / comments',
   ]);
   assert.equal(rows.length, 1, 'filters apply');
-  assert.equal(rows[0].Opportunity, 'Overdue export');
-  assert.equal(rows[0].Contact, 'Ms. Iyer');
-  assert.equal(rows[0].Phone, '9000044444');
-  assert.equal(rows[0]['Weighted value'], 500000);
-  assert.equal(rows[0].Overdue, 'Yes');
+  const [row] = rows;
+  assert.equal(row.Opportunity, 'Overdue export');
+  assert.equal(row['Opportunity ID'], late.code);
+  assert.deepEqual([row['Contact name'], row['Contact number'], row['Contact email'], row.Designation, row.Department], ['Ms. Iyer', '9000044444', 'iyer@example.com', 'QC Head', 'Quality']);
+  assert.equal(row.Salesperson, 'Exporter');
+  assert.equal(row['Salesperson ID'], 'E');
+  assert.equal(row['Weighted value'], 500000);
+  assert.equal(row.Overdue, 'Yes');
 
-  const own = await readSheet(await rep.client.requestRaw('GET', '/api/opportunities/export.xlsx'));
-  assert.equal(own.rows.some((r) => r.Opportunity === others.title), false, 'a salesperson gets only their own deals');
-  const all = await readSheet(await office.requestRaw('GET', '/api/opportunities/export.xlsx?limit=1'));
-  assert.ok(all.rows.some((r) => r.Opportunity === others.title), 'office staff get everyone’s');
+  // Two OEMs: each gets its own OEM and Products columns.
+  const ap = await createProduct('EXPORT-AP', 'Anton Paar');
+  await openDeal(rep.client, { title: 'Two makes', oem_ids: [dealFields.oem_id, ap.oem_id], product_ids: [...dealFields.product_ids, ap.id] });
+  const multi = await readSheet(await admin.requestRaw('GET', `/api/opportunities/export.xlsx?${mine}`));
+  assert.deepEqual(multi.header.slice(9, 13), ['OEM 1', 'Products (OEM 1)', 'OEM 2', 'Products (OEM 2)']);
+  const two = multi.rows.find((r) => r.Opportunity === 'Two makes');
+  assert.deepEqual([two['OEM 1'], two['OEM 2']].sort(), ['Anton Paar', 'PerkinElmer']);
+  assert.equal(two[`Products (OEM ${two['OEM 1'] === 'Anton Paar' ? 1 : 2})`], 'Product EXPORT-AP');
+
+  // Only the chosen columns, still in the agreed order.
+  const chosen = await readSheet(await admin.requestRaw('GET', `/api/opportunities/export.xlsx?${mine}&columns=deal,code,salesperson`));
+  assert.deepEqual(chosen.header, ['Opportunity ID', 'Opportunity', 'Salesperson']);
+  assert.equal((await admin.requestRaw('GET', '/api/opportunities/export.xlsx?columns=nonsense')).status, 400);
+  const columns = (await admin.request('GET', '/api/opportunities/export-columns')).body;
+  assert.equal(columns[0].label, 'Created date');
+  assert.ok(columns.some((c) => c.key === 'oems'));
 });

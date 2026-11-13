@@ -34,7 +34,7 @@ function FunnelChart({ funnel }: { funnel: Funnel }) {
   return (
     <div className="px-4 sm:px-5 py-4 flex flex-col gap-4">
       <p className="text-sm">
-        Of <b>{funnel.total}</b> opportunities opened, <b>{won.reached}</b> {won.reached === 1 ? 'was' : 'were'} won ({Math.round((won.reached / top) * 100)}%), {funnel.lost_or_abandoned} lost or abandoned, and {funnel.total - won.reached - funnel.lost_or_abandoned} still open.
+        Of <b>{funnel.total}</b> opportunities opened, <b>{won.reached}</b> {won.reached === 1 ? 'was' : 'were'} won ({Math.round((won.reached / top) * 100)}%), {funnel.lost} lost, and {funnel.total - won.reached - funnel.lost} still open.
         {weakest && weakest.to_next_pct! < 100 && (
           <>
             {' '}
@@ -57,7 +57,7 @@ function FunnelChart({ funnel }: { funnel: Funnel }) {
             </div>
             <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-ink-muted">
               {s.open_now > 0 && <span>{s.open_now} open here</span>}
-              {s.dropped > 0 && <span>{s.dropped} lost or abandoned here</span>}
+              {s.dropped > 0 && <span>{s.dropped} lost here</span>}
               {s.avg_days !== null && <span>about {Math.round(s.avg_days)} days here</span>}
             </div>
             {i < funnel.stages.length - 1 && s.to_next_pct !== null && (

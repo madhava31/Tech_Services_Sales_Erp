@@ -2,10 +2,13 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, DealInput, ErpQuotation, LostReason, OpportunityDetail, QuotationStatus, Stage } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
+import { askConfirm } from '../../lib/confirm';
 import { useLoad } from '../../lib/useLoad';
 import {
   LOST_REASON_LABELS,
   OPEN_STAGES,
+  QUOTED_STAGES,
+  competitorText,
   OUTCOME_LABELS,
   QUOTATION_STATUS_LABELS,
   STAGE_LABELS,
@@ -21,9 +24,9 @@ import { canRecordQuotations, canWriteCrm, isManagingRole } from '../../lib/role
 import DealFields, { DealDraft, dealDraftComplete, dealToDraft, draftToInput } from '../../components/DealFields';
 import ContactLogCard from '../../components/ContactLogCard';
 import TenderCard from '../../components/TenderCard';
-import { Badge, Button, Card, CardHeader, EmptyState, Notice, OverdueBadge, SelectField, StuckBadge, TextAreaField, TextField, LoadingCard } from '../../components/ui';
+import { Badge, Button, Card, CardHeader, EmptyState, Notice, OverdueBadge, SelectField, StuckBadge, TextField, LoadingCard } from '../../components/ui';
 
-type Panel = 'move' | 'won' | 'lost' | 'abandoned' | 'reopen' | 'edit' | 'transfer' | null;
+type Panel = 'won' | 'lost' | 'reopen' | 'edit' | 'transfer' | null;
 
 export default function DealDetail() {
   const id = Number(useParams().id);
@@ -57,6 +60,18 @@ export default function DealDetail() {
   const open = !d.closed_at;
   const writer = canWriteCrm(user?.role);
   const stageIndex = OPEN_STAGES.indexOf(d.stage);
+  // The step after the current one on the stepper. Negotiation's next step is Mark won or Mark lost.
+  const nextStage = stageIndex >= 0 && stageIndex < OPEN_STAGES.length - 1 ? OPEN_STAGES[stageIndex + 1] : null;
+
+  async function moveToNext() {
+    if (!d || !nextStage) return;
+    if (QUOTED_STAGES.includes(nextStage) && d.quotation_count === 0) {
+      setError(`${STAGE_LABELS[nextStage]} needs the quotation first: the office or a manager records it on this opportunity.`);
+      return;
+    }
+    if (!(await askConfirm(`Move "${d.title}" from ${STAGE_LABELS[d.stage]} to ${STAGE_LABELS[nextStage]}?`, `Move to ${STAGE_LABELS[nextStage]}`))) return;
+    await run(() => api.opportunities.moveStage(d.id, { stage: nextStage }), `Moved to ${STAGE_LABELS[nextStage]}.`);
+  }
   const stepInset = 100 / (2 * OPEN_STAGES.length);
   const stepFill = (100 - 2 * stepInset) * (d.stage === 'won' ? 1 : open ? stageIndex / (OPEN_STAGES.length - 1) : 0);
 
@@ -66,36 +81,76 @@ export default function DealDetail() {
         <Link to={`/companies/${d.company_id}`} className="ts-back">
           ← {d.company_name}
         </Link>
-        <h1 className="ts-title">{d.title}</h1>
-        <div className="flex flex-wrap items-center gap-2 mt-3">
-          <Badge tone={d.stage === 'won' ? 'ok' : d.stage === 'lost' || d.stage === 'abandoned' ? 'muted' : 'brand'}>{STAGE_LABELS[d.stage]}</Badge>
+        {/* ID and status first, then the name, then the facts that matter in labelled boxes. */}
+        <div className="flex flex-wrap items-center gap-2 mb-2">
+          <span className="inline-flex items-center rounded-full bg-tile px-3 py-1 text-[13px] font-medium tabular-nums tracking-wide select-all" title="Opportunity ID">
+            {d.code}
+          </span>
+          <Badge tone={d.stage === 'won' ? 'ok' : d.stage === 'lost' ? 'muted' : 'brand'}>{STAGE_LABELS[d.stage]}</Badge>
           {d.is_overdue && <OverdueBadge />}
           {d.is_stuck && <StuckBadge days={d.days_in_stage} />}
-          <span className="text-sm font-medium tabular-nums">
-            {d.stage === 'won' ? formatMoney(d.won_value) : formatMoney(d.estimated_value)}
-          </span>
-          {open && <span className="text-xs text-subtle">{d.probability}% likely</span>}
-          {open && d.expected_close_date && (
-            <span className={`text-xs ${d.is_overdue ? 'text-danger font-medium' : 'text-subtle'}`}>
-              closes {formatDate(d.expected_close_date)}
-            </span>
-          )}
         </div>
-        {open && d.days_in_stage !== null && (
-          <p className="text-[13px] ts-muted mt-2">
-            In {STAGE_LABELS[d.stage]} for {d.days_in_stage} day{d.days_in_stage === 1 ? '' : 's'}
-            {d.is_stuck && `, longer than the ${d.stuck_after_days} days expected. What’s the next step?`}
+        <h1 className="ts-title">{d.title}</h1>
+
+        <dl className="ts-dw-meta ts-deal-facts mt-4">
+          <div>
+            <dt>{d.stage === 'won' ? 'Won value' : 'Order value'}</dt>
+            <dd className="text-[19px] font-medium tabular-nums">{formatMoney(d.stage === 'won' ? d.won_value : d.estimated_value)}</dd>
+          </div>
+          {open ? (
+            <div>
+              <dt>Win chance</dt>
+              <dd className="text-[19px] font-medium tabular-nums">{d.probability}%</dd>
+            </div>
+          ) : (
+            <div>
+              <dt>Result</dt>
+              <dd className={`text-[19px] font-medium ${d.stage === 'won' ? 'text-ok' : 'text-danger'}`}>{STAGE_LABELS[d.stage]}</dd>
+            </div>
+          )}
+          <div>
+            <dt>{open ? 'Closes' : 'Closed'}</dt>
+            <dd className={d.is_overdue ? 'text-danger font-medium' : ''}>
+              {open ? (d.expected_close_date ? formatDate(d.expected_close_date) : '—') : d.closed_at ? formatDate(d.closed_at) : '—'}
+              {d.is_overdue && ' · overdue'}
+            </dd>
+          </div>
+          {open && (
+            <div>
+              <dt>In this stage</dt>
+              <dd className={d.is_stuck ? 'text-warn font-medium' : ''}>
+                {d.days_in_stage === null ? '—' : d.days_in_stage === 0 ? 'Since today' : `${d.days_in_stage} day${d.days_in_stage === 1 ? '' : 's'}`}
+              </dd>
+            </div>
+          )}
+          <div>
+            <dt>Owner</dt>
+            <dd>
+              {d.owner_name}
+              {d.original_owner_salesperson_id !== d.owner_salesperson_id && <small className="block text-xs ts-muted">opened by {d.original_owner_name}</small>}
+            </dd>
+          </div>
+          <div>
+            <dt>Contact person</dt>
+            <dd>
+              {d.contact_name ?? '—'}
+              {d.contact_phone && (
+                <a href={`tel:${d.contact_phone}`} className="block text-brand font-medium tabular-nums">
+                  {d.contact_phone}
+                </a>
+              )}
+            </dd>
+          </div>
+        </dl>
+        {d.is_stuck && (
+          <p className="text-[13px] text-warn mt-3">
+            In {STAGE_LABELS[d.stage]} longer than the {d.stuck_after_days} days expected. What’s the next step?
           </p>
         )}
-        <p className="text-[13px] ts-muted mt-1">
-          Owner: {d.owner_name}
-          {d.original_owner_salesperson_id !== d.owner_salesperson_id && ` (opened by ${d.original_owner_name})`}
-        </p>
-        {d.closed_at && (
-          <p className="text-sm mt-2">
-            {STAGE_LABELS[d.stage]}
-            {d.lost_reason && ` (${LOST_REASON_LABELS[d.lost_reason]})`}
-            {d.close_reason && `: ${d.close_reason}`}
+        {d.closed_at && (d.lost_reason || d.close_reason) && (
+          <p className="text-sm mt-3">
+            {d.lost_reason && <b className="font-medium">{LOST_REASON_LABELS[d.lost_reason]}. </b>}
+            {d.close_reason}
           </p>
         )}
       </header>
@@ -129,14 +184,16 @@ export default function DealDetail() {
         <div className="flex flex-wrap gap-2">
           {open ? (
             <>
-              <Button size="sm" variant="secondary" onClick={() => setPanel('move')}>
-                Move stage
-              </Button>
-              {stageIndex < OPEN_STAGES.indexOf('quotation_requested') && (
+              {nextStage && (
+                <Button size="sm" variant="secondary" disabled={busy} onClick={() => void moveToNext()} title={`Move to ${STAGE_LABELS[nextStage]}`}>
+                  Move to next stage
+                </Button>
+              )}
+              {stageIndex < OPEN_STAGES.indexOf('develop') && (
                 <Button
                   size="sm"
                   disabled={busy}
-                  onClick={() => run(() => api.opportunities.moveStage(d.id, { stage: 'quotation_requested' }), 'Quotation requested. The office has it in their queue.')}
+                  onClick={() => run(() => api.opportunities.moveStage(d.id, { stage: 'develop' }), 'Moved to Develop: quotation requested. The office has it in their queue.')}
                 >
                   Request quotation
                 </Button>
@@ -146,9 +203,6 @@ export default function DealDetail() {
               </Button>
               <Button size="sm" variant="danger" onClick={() => setPanel('lost')}>
                 Mark lost
-              </Button>
-              <Button size="sm" variant="danger" onClick={() => setPanel('abandoned')}>
-                Abandon
               </Button>
               <Button size="sm" variant="ghost" onClick={() => setPanel('edit')}>
                 Edit details
@@ -171,10 +225,10 @@ export default function DealDetail() {
 
       {panel && (
         <Card className="p-4 sm:p-5">
-          {(panel === 'move' || panel === 'reopen') && (
+          {panel === 'reopen' && (
             <MoveForm
               current={d.stage}
-              reopen={panel === 'reopen'}
+              reopen
               hasQuotation={d.quotation_count > 0}
               busy={busy}
               onCancel={() => setPanel(null)}
@@ -194,13 +248,6 @@ export default function DealDetail() {
               busy={busy}
               onCancel={() => setPanel(null)}
               onSubmit={(lost_reason, close_reason) => run(() => api.opportunities.moveStage(d.id, { stage: 'lost', lost_reason, close_reason }), 'Opportunity marked lost.')}
-            />
-          )}
-          {panel === 'abandoned' && (
-            <AbandonForm
-              busy={busy}
-              onCancel={() => setPanel(null)}
-              onSubmit={(close_reason) => run(() => api.opportunities.moveStage(d.id, { stage: 'abandoned', close_reason }), 'Opportunity marked abandoned.')}
             />
           )}
           {panel === 'edit' && (
@@ -225,10 +272,10 @@ export default function DealDetail() {
           {(
             [
               ['Created', formatDate(d.created_at)],
-              ['Contact', d.contact_name ? `${d.contact_name}${d.contact_phone ? ` · ${d.contact_phone}` : ''}` : null],
-              ['OEM', d.oem_name],
+              [d.oems.length > 1 ? 'OEMs' : 'OEM', d.oem_name],
               ['Products', d.products.map((p) => p.name).join(', ')],
               ['Win probability', `${d.probability}%${d.probability_reason ? ` · ${d.probability_reason}` : ''}`],
+              ['Competitor', competitorText(d.competitor, d.competitor_note)],
               ['Tender', d.tender ? 'Yes' : 'No'],
               ['Market segment', d.segments.map((s) => s.name).join(', ')],
               ['Comments', d.notes],
@@ -398,7 +445,7 @@ function MoveForm({
   const options = OPEN_STAGES.filter((s) => s !== current);
   const [stage, setStage] = useState<Stage>(options[0]);
   const [note, setNote] = useState('');
-  const needsQuote = (stage === 'quotation_sent' || stage === 'negotiation') && !hasQuotation;
+  const needsQuote = QUOTED_STAGES.includes(stage) && !hasQuotation;
   return (
     <form
       className="ts-fgrid ts-g2 !mt-0"
@@ -492,29 +539,6 @@ function LostForm({ busy, onCancel, onSubmit }: { busy: boolean; onCancel: () =>
   );
 }
 
-function AbandonForm({ busy, onCancel, onSubmit }: { busy: boolean; onCancel: () => void; onSubmit: (reason: string) => void }) {
-  const [reason, setReason] = useState('');
-  return (
-    <form
-      className="flex flex-col gap-3"
-      onSubmit={(e) => {
-        e.preventDefault();
-        onSubmit(reason);
-      }}
-    >
-      <TextAreaField label="Why is it being abandoned?" rows={2} placeholder="e.g. Customer project on hold, no reply for two months" value={reason} onChange={(e) => setReason(e.target.value)} required />
-      <div className="flex gap-2">
-        <Button type="submit" size="sm" variant="danger" disabled={busy || !reason.trim()}>
-          Abandon opportunity
-        </Button>
-        <Button size="sm" variant="ghost" onClick={onCancel}>
-          Cancel
-        </Button>
-      </div>
-    </form>
-  );
-}
-
 function EditForm({ deal, busy, onCancel, onSubmit }: { deal: OpportunityDetail; busy: boolean; onCancel: () => void; onSubmit: (data: DealInput) => void }) {
   const [form, setForm] = useState<DealDraft>(() => dealToDraft(deal));
   return (
@@ -568,7 +592,7 @@ function Quotations({ deal, canRecord, onChanged, onError }: { deal: Opportunity
     <Card>
       <CardHeader
         title="Quotations"
-        description={deal.stage === 'quotation_requested' && deal.quotations.length === 0 ? 'Waiting for the office to prepare the quotation in the ERP.' : undefined}
+        description={deal.stage === 'develop' && deal.quotations.length === 0 ? 'Waiting for the office to prepare the quotation in the ERP.' : undefined}
         action={
           canRecord && open && !adding ? (
             <Button size="sm" variant="secondary" onClick={() => setAdding(true)}>

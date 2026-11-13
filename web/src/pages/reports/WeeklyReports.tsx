@@ -217,7 +217,7 @@ export default function WeeklyReports() {
               <Tile label="Orders won" value={formatMoney(t.won_value, { compact: true })} hint={`${t.deals_won} opportunities. ${change(t.won_value, p.won_value, (n) => formatMoney(n, { compact: true }))}`} tone="ok" />
               <Tile label="Opportunities" value={t.visits} hint={change(t.visits, p.visits, String)} />
               <Tile label="New opportunities" value={t.deals_opened} hint={change(t.deals_opened, p.deals_opened, String)} />
-              <Tile label="Lost or abandoned" value={t.deals_lost + t.deals_abandoned} hint={`${t.deals_lost} lost, ${t.deals_abandoned} abandoned`} />
+              <Tile label="Lost" value={t.deals_lost} hint={change(t.deals_lost, p.deals_lost, String)} />
             </div>
           </section>
           <section>

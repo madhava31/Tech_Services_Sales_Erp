@@ -1,20 +1,32 @@
-import type { BidStatus, EmdStatus, LostReason, Outcome, QuotationStatus, Stage, TaskType, Urgency } from './api';
+import type { BidStatus, Competitor, EmdStatus, LostReason, Outcome, QuotationStatus, Stage, TaskType, Urgency } from './api';
 
 export const STAGE_LABELS: Record<Stage, string> = {
-  new_prospect: 'New prospect',
-  visit_completed: 'Visited',
-  qualified: 'Qualified',
-  quotation_requested: 'Quote requested',
-  quotation_sent: 'Quote sent',
+  create: 'Create',
+  qualify: 'Qualify',
+  develop: 'Develop',
+  prove: 'Prove',
   negotiation: 'Negotiation',
   won: 'Won',
   lost: 'Lost',
-  abandoned: 'Abandoned',
 };
 
-export const OPEN_STAGES: Stage[] = ['new_prospect', 'visit_completed', 'qualified', 'quotation_requested', 'quotation_sent', 'negotiation'];
+export const OPEN_STAGES: Stage[] = ['create', 'qualify', 'develop', 'prove', 'negotiation'];
 
-export const CLOSED_STAGES: Stage[] = ['won', 'lost', 'abandoned'];
+export const CLOSED_STAGES: Stage[] = ['won', 'lost'];
+
+// Stages that need the quotation number.
+export const QUOTED_STAGES: Stage[] = ['prove', 'negotiation'];
+
+export const COMPETITOR_LABELS: Record<Competitor, string> = {
+  no_idea: 'No idea',
+  no_competitor: 'No competitor',
+  other: 'Other',
+};
+
+export function competitorText(competitor: Competitor | null, note: string | null) {
+  if (!competitor) return null;
+  return competitor === 'other' ? note : COMPETITOR_LABELS[competitor];
+}
 
 export const LOST_REASON_LABELS: Record<LostReason, string> = {
   price: 'Price too high',
@@ -135,12 +147,12 @@ export function formatDate(value: string) {
   return d.toLocaleDateString('en-IN', {
     day: 'numeric',
     month: 'short',
-    year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric',
+    year: 'numeric',
   });
 }
 
 export function formatDateTime(value: string) {
-  return new Date(value).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+  return new Date(value).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
 export function dueLabel(dueDate: string, today = localDate()) {

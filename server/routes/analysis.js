@@ -17,7 +17,6 @@ function dealFilter(req, params) {
   let where = scopeFilter(req.user, 'o.owner_salesperson_id', params);
   for (const [key, column] of [
     ['salesperson_id', 'o.owner_salesperson_id'],
-    ['oem_id', 'o.oem_id'],
   ]) {
     if (req.query[key]) {
       const id = Number(req.query[key]);
@@ -25,6 +24,13 @@ function dealFilter(req, params) {
       where += ` AND ${column} = ?`;
       params.push(id);
     }
+  }
+  // Several OEMs: the opportunity counts under each of them.
+  if (req.query.oem_id) {
+    const id = Number(req.query.oem_id);
+    if (!Number.isInteger(id)) throw new HttpError(400, 'oem_id must be a number');
+    where += ' AND EXISTS (SELECT 1 FROM opportunity_oem oo WHERE oo.opportunity_id = o.id AND oo.oem_id = ?)';
+    params.push(id);
   }
   return where;
 }
@@ -77,7 +83,7 @@ router.get('/funnel', async (req, res) => {
     const openByStage = await db
       .prepare(
         `SELECT o.stage, COUNT(*)::int AS deals, COALESCE(SUM(o.estimated_value), 0)::float AS value
-         FROM opportunity o WHERE o.stage NOT IN ('won', 'lost', 'abandoned')${openFilter} GROUP BY o.stage`
+         FROM opportunity o WHERE o.stage NOT IN ('won', 'lost')${openFilter} GROUP BY o.stage`
       )
       .all(...openParams);
 
@@ -85,7 +91,7 @@ router.get('/funnel', async (req, res) => {
       days,
       today,
       total: deals.length,
-      lost_or_abandoned: rows.reduce((sum, r) => sum + r.dropped, 0),
+      lost: rows.reduce((sum, r) => sum + r.dropped, 0),
       stages: rows.map(({ days_total: total, days_count: count, ...row }, i) => ({
         ...row,
         // Of the deals that reached this stage, the share that reached the next one.
@@ -130,7 +136,7 @@ router.get('/forecast', async (req, res) => {
         `SELECT o.id, o.title, o.stage, o.estimated_value, o.probability, o.expected_close_date, c.name AS company_name,
                 o.owner_salesperson_id, sp.name AS owner_name
          FROM opportunity o JOIN company c ON c.id = o.company_id JOIN salesperson sp ON sp.id = o.owner_salesperson_id
-         WHERE o.stage NOT IN ('won', 'lost', 'abandoned')${filter}
+         WHERE o.stage NOT IN ('won', 'lost')${filter}
          ORDER BY o.expected_close_date NULLS LAST, o.estimated_value DESC NULLS LAST`
       )
       .all(...params);

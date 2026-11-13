@@ -184,7 +184,7 @@ test('quotations: picked from the ERP on a deal, then kept current and locked', 
   assert.equal(picked.body.amount, 118000);
   assert.equal(picked.body.quotation_date, '2026-10-01');
   assert.equal(picked.body.source, 'erp');
-  assert.equal((await ravi.client.request('GET', `/api/opportunities/${deal.id}`)).body.stage, 'quotation_sent');
+  assert.equal((await ravi.client.request('GET', `/api/opportunities/${deal.id}`)).body.stage, 'prove');
   assert.equal((await office.request('POST', `/api/opportunities/${deal.id}/quotations`, { erp_quotation_id: 21 })).status, 409);
   assert.ok(!(await office.request('GET', `/api/opportunities/${deal.id}/erp-quotations`)).body.some((q) => q.id === 21), 'no longer offered');
 
@@ -206,7 +206,7 @@ test('quotations: picked from the ERP on a deal, then kept current and locked', 
   const seen = (await ravi.client.request('GET', `/api/opportunities/${deal.id}`)).body;
   assert.equal(seen.erp_orders[0].number, 'PO-1');
   assert.equal(seen.erp_orders[0].client_po_ref, 'CL-77');
-  assert.equal(seen.stage, 'quotation_sent');
+  assert.equal(seen.stage, 'prove');
   assert.ok((await ravi.client.request('GET', '/api/today')).body.erp_orders.some((o) => o.id === deal.id));
   assert.ok(!(await priya.client.request('GET', '/api/today')).body.erp_orders.some((o) => o.id === deal.id));
   await ravi.client.request('POST', `/api/opportunities/${deal.id}/stage`, { stage: 'won', won_value: 120000, close_reason: 'PO received' });

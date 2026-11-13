@@ -1,6 +1,6 @@
 // Load realistic sample data into the LOCAL database so every screen and dashboard has something
 // to show: 50 companies with contacts, ~150 visits over the last six months, ~50 deals across every
-// stage (with history, quotations, won/lost/abandoned results, OEMs, products and segments),
+// stage (with history, quotations, won/lost results, OEMs, products and segments),
 // requirements, follow-ups, a pending and a rejected company, and overdue deals.
 //
 //   npm run seed:demo
@@ -139,7 +139,6 @@ const STATES = { Hyderabad: 'Telangana', Warangal: 'Telangana', Vizag: 'Andhra P
 const CLOSE_REASONS = {
   won: ['PO received after final negotiation', 'Beat the competitor on service support', 'Repeat customer, ordered after demo'],
   lost: ['Customer chose a cheaper local option', 'Budget moved to next year', 'Went with their existing supplier'],
-  abandoned: ['Customer project on hold, no reply for two months', 'Requirement dropped after a management change'],
 };
 const PROBABILITY_REASONS = ['Budget confirmed', 'Competing with one other vendor', 'Early discussion only', 'Demo went well'];
 const TIMELINES = ['This month', 'Within 2 months', 'This quarter', 'Next quarter', 'After budget approval'];
@@ -148,7 +147,8 @@ const NEW_SALESPEOPLE = [
   ['SE-005', 'Vikram Singh'],
 ];
 
-const OPEN_STAGE_FLOW = ['new_prospect', 'visit_completed', 'qualified', 'quotation_requested', 'quotation_sent', 'negotiation'];
+const OPEN_STAGE_FLOW = ['create', 'qualify', 'develop', 'prove', 'negotiation'];
+const COMPETITORS = ['Shimadzu', 'Agilent', 'Thermo Fisher', 'a local dealer'];
 
 async function main() {
   const url = process.env.DATABASE_URL;
@@ -196,7 +196,7 @@ async function main() {
     // Ravi gets the biggest share so his own dashboard is full.
     const ownerFor = () => (rand() < 0.36 ? ravi : pick(people));
 
-    const counts = { companies: 0, pending: 0, rejected: 0, contacts: 0, visits: 0, drafts: 0, requirements: 0, deals: 0, abandoned: 0, overdue: 0, quotations: 0, tasksOpen: 0, tasksDone: 0 };
+    const counts = { companies: 0, pending: 0, rejected: 0, contacts: 0, visits: 0, drafts: 0, requirements: 0, deals: 0, overdue: 0, quotations: 0, tasksOpen: 0, tasksDone: 0 };
     let quotationNo = 4100;
     // Phone numbers are unique across contacts, so hand them out in sequence.
     let contactPhone = 9000100000;
@@ -322,19 +322,17 @@ async function main() {
         // Older deals are more likely to be closed.
         let finalStage =
           ageDays > 45
-            ? weighted([['won', 3], ['lost', 2], ['abandoned', 1], ['negotiation', 2], ['quotation_sent', 2], ['qualified', 1]])
+            ? weighted([['won', 3], ['lost', 3], ['negotiation', 2], ['prove', 2], ['qualify', 1]])
             : ageDays > 15
-              ? weighted([['won', 2], ['lost', 1], ['negotiation', 2], ['quotation_sent', 3], ['quotation_requested', 2], ['qualified', 2]])
-              : weighted([['qualified', 3], ['quotation_requested', 3], ['visit_completed', 2], ['new_prospect', 1], ['quotation_sent', 1]]);
-        // Always at least one abandoned deal to look at.
-        if (counts.abandoned === 0 && ageDays > 15) finalStage = 'abandoned';
+              ? weighted([['won', 2], ['lost', 1], ['negotiation', 2], ['prove', 3], ['develop', 2], ['qualify', 2]])
+              : weighted([['qualify', 4], ['develop', 3], ['create', 1], ['prove', 1]]);
         const dealProduct = di === 0 ? product : pick(PRODUCTS);
         const dealValue = di === 0 ? value : Math.round(int(dealProduct[3][0], dealProduct[3][1]) / 1000) * 1000;
-        const closed = ['won', 'lost', 'abandoned'].includes(finalStage);
-        const startStage = activeVisit.outcome === 'quotation_requested' ? 'quotation_requested' : activeVisit.outcome === 'interested' ? 'qualified' : 'visit_completed';
+        const closed = ['won', 'lost'].includes(finalStage);
+        const startStage = activeVisit.outcome === 'quotation_requested' ? 'develop' : 'qualify';
         // Path from the starting stage to the final one, one history row per step.
         const path = [startStage];
-        const target = closed ? (finalStage === 'won' ? 'negotiation' : finalStage === 'abandoned' ? 'qualified' : pick(['qualified', 'quotation_sent', 'negotiation'])) : finalStage;
+        const target = closed ? (finalStage === 'won' ? 'negotiation' : pick(['qualify', 'prove', 'negotiation'])) : finalStage;
         if (stageOrder(target) > stageOrder(startStage)) {
           for (const s of OPEN_STAGE_FLOW) if (stageOrder(s) > stageOrder(startStage) && stageOrder(s) <= stageOrder(target)) path.push(s);
         } else if (stageOrder(target) < stageOrder(startStage)) {
@@ -353,18 +351,21 @@ async function main() {
         const overdue = !closed && (counts.overdue === 0 || rand() < 0.2);
         const expectedClose = closed ? new Date(closedAt.getTime() + IST_OFFSET).toISOString().slice(0, 10) : overdue ? istDate(int(1, 20)) : istDate(-int(5, 60));
         if (overdue) counts.overdue++;
-        if (finalStage === 'abandoned') counts.abandoned++;
-        const oemId = pick(oemIds);
-        const oemProducts = catalogue.filter((p) => p.oem_id === oemId);
-        const chosenProducts = oemProducts.length > 1 && rand() < 0.3 ? oemProducts.slice(0, 2) : [pick(oemProducts)];
+        // Most deals are one make; some combine two, each with its own products.
+        const chosenOems = oemIds.length > 1 && rand() < 0.2 ? [pick(oemIds), pick(oemIds)].filter((id, i, all) => all.indexOf(id) === i) : [pick(oemIds)];
+        const chosenProducts = chosenOems.flatMap((oemId) => {
+          const oemProducts = catalogue.filter((p) => p.oem_id === oemId);
+          return oemProducts.length > 1 && rand() < 0.3 ? oemProducts.slice(0, 2) : [pick(oemProducts)];
+        });
+        const competitor = weighted([['no_idea', 3], ['no_competitor', 2], ['other', 3]]);
         const chosenSegments = rand() < 0.3 ? [segmentRows[0], pick(segmentRows.slice(1))] : [pick(segmentRows)];
         const probability = finalStage === 'won' ? 100 : closed ? 0 : weighted([[25, 3], [50, 4], [75, 2], [100, 1]]);
 
         const [deal] = await q(
           `INSERT INTO opportunity (company_id, title, owner_salesperson_id, original_owner_salesperson_id, stage, estimated_value, probability,
                                     expected_close_date, source_visit_id, won_value, lost_reason, close_reason, closed_at, created_by, created_at, updated_at,
-                                    oem_id, contact_id, probability_reason, tender, notes)
-           VALUES ($1, $2, $3, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20) RETURNING id`,
+                                    contact_id, probability_reason, tender, notes, competitor, competitor_note)
+           VALUES ($1, $2, $3, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21) RETURNING id`,
           [
             company.id,
             dealProduct[1],
@@ -381,14 +382,16 @@ async function main() {
             creatorOf(owner),
             createdAt,
             stepTimes[stepTimes.length - 1],
-            oemId,
             pick(contacts),
             pick(PROBABILITY_REASONS),
             rand() < 0.15,
             rand() < 0.4 ? 'Customer wants installation and training included.' : null,
+            competitor,
+            competitor === 'other' ? pick(COMPETITORS) : null,
           ]
         );
         counts.deals++;
+        for (const oemId of chosenOems) await q(`INSERT INTO opportunity_oem (opportunity_id, oem_id) VALUES ($1, $2)`, [deal.id, oemId]);
         for (const p of chosenProducts) await q(`INSERT INTO opportunity_product (opportunity_id, product_id) VALUES ($1, $2)`, [deal.id, p.id]);
         for (const s of chosenSegments) await q(`INSERT INTO opportunity_segment (opportunity_id, segment_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [deal.id, s.id]);
 
@@ -401,10 +404,10 @@ async function main() {
         }
 
         // Quotation recorded when the deal reached "quote sent".
-        const sentIndex = path.indexOf('quotation_sent');
+        const sentIndex = path.indexOf('prove');
         if (sentIndex >= 0 || finalStage === 'won') {
           const at = stepTimes[sentIndex >= 0 ? sentIndex : Math.max(0, path.length - 2)];
-          const status = finalStage === 'won' ? 'accepted' : finalStage === 'lost' || finalStage === 'abandoned' ? (lostReason === 'price' || lostReason === 'competitor' ? 'rejected' : 'sent') : 'sent';
+          const status = finalStage === 'won' ? 'accepted' : finalStage === 'lost' ? (lostReason === 'price' || lostReason === 'competitor' ? 'rejected' : 'sent') : 'sent';
           await q(
             `INSERT INTO quotation_link (opportunity_id, quotation_number, quotation_date, amount, status, created_by, created_at, updated_at)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $7)`,

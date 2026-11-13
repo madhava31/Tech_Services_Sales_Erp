@@ -51,16 +51,16 @@ test('a deal records its creator as owner and original owner, with a "created" h
   const deal = await openDeal(ravi.client, { owner_salesperson_id: priya.salespersonId });
   assert.equal(deal.owner_salesperson_id, ravi.salespersonId);
   assert.equal(deal.original_owner_salesperson_id, ravi.salespersonId);
-  assert.equal(deal.stage, 'new_prospect');
+  assert.equal(deal.stage, 'create');
   assert.equal(deal.probability, 25, 'the default win probability');
   const detail = await ravi.client.request('GET', `/api/opportunities/${deal.id}`);
-  assert.deepEqual(detail.body.history.map((h) => [h.change_type, h.to_value]), [['created', 'new_prospect']]);
+  assert.deepEqual(detail.body.history.map((h) => [h.change_type, h.to_value]), [['created', 'create']]);
 });
 
 test('deals are private to their owner; managers and office staff see all', async () => {
   const deal = await openDeal(ravi.client);
   assert.equal((await priya.client.request('GET', `/api/opportunities/${deal.id}`)).body.error, 'Opportunity not found');
-  assert.equal((await priya.client.request('POST', `/api/opportunities/${deal.id}/stage`, { stage: 'qualified' })).body.error, 'Opportunity not found');
+  assert.equal((await priya.client.request('POST', `/api/opportunities/${deal.id}/stage`, { stage: 'qualify' })).body.error, 'Opportunity not found');
   assert.ok((await priya.client.request('GET', '/api/opportunities')).body.every((o) => o.owner_salesperson_id === priya.salespersonId));
   assert.equal((await manager.request('GET', `/api/opportunities/${deal.id}`)).status, 200);
   assert.equal((await office.request('GET', `/api/opportunities/${deal.id}`)).status, 200);
@@ -73,7 +73,7 @@ test('completing a visit can open a deal at the stage the outcome implies', asyn
     opportunity: { title: 'Cooling tower pumps', ...dealFields, estimated_value: 450000 },
   });
   assert.equal(res.status, 200, JSON.stringify(res.body));
-  assert.equal(res.body.opportunity_stage, 'quotation_requested');
+  assert.equal(res.body.opportunity_stage, 'develop');
   const deal = (await ravi.client.request('GET', `/api/opportunities/${res.body.opportunity_id}`)).body;
   assert.equal(deal.source_visit_id, visit.id);
   assert.equal(deal.requirements.length, 1, 'the visit’s requirements belong to the deal');
@@ -87,11 +87,11 @@ test('completing a visit can open a deal at the stage the outcome implies', asyn
 test('a later visit moves an existing deal forward but never backwards', async () => {
   const deal = await openDeal(ravi.client);
   const { res } = await completeVisit(ravi.client, { outcome: 'interested', requirements: [REQUIREMENT], follow_up: FOLLOW_UP, opportunity: { id: deal.id } });
-  assert.equal(res.body.opportunity_stage, 'qualified');
+  assert.equal(res.body.opportunity_stage, 'qualify');
   const { res: again } = await completeVisit(ravi.client, { outcome: 'follow_up_needed', requirements: [REQUIREMENT], follow_up: FOLLOW_UP, opportunity: { id: deal.id } });
-  assert.equal(again.body.opportunity_stage, 'qualified', 'follow-up needed does not move it back to visit completed');
+  assert.equal(again.body.opportunity_stage, 'qualify', 'follow-up needed does not move it back to visit completed');
   const { res: notInterested } = await completeVisit(ravi.client, { outcome: 'not_interested', opportunity: { id: deal.id } });
-  assert.equal(notInterested.body.opportunity_stage, 'qualified', '"not interested" never closes a deal by itself');
+  assert.equal(notInterested.body.opportunity_stage, 'qualify', '"not interested" never closes a deal by itself');
 });
 
 test('deal links from a visit are validated', async () => {
@@ -108,19 +108,19 @@ test('deal links from a visit are validated', async () => {
 
 test('quotations: office records them, the deal advances, salespeople cannot', async () => {
   const deal = await openDeal(ravi.client);
-  assert.equal((await ravi.client.request('POST', `/api/opportunities/${deal.id}/stage`, { stage: 'quotation_sent' })).status, 400, 'no quotation yet');
+  assert.equal((await ravi.client.request('POST', `/api/opportunities/${deal.id}/stage`, { stage: 'prove' })).status, 400, 'no quotation yet');
   assert.equal((await ravi.client.request('POST', `/api/opportunities/${deal.id}/quotations`, { quotation_number: 'QTN-1' })).status, 403);
 
   const draft = await office.request('POST', `/api/opportunities/${deal.id}/quotations`, { quotation_number: 'QTN-100', amount: 480000, status: 'draft' });
   assert.equal(draft.status, 201);
-  assert.equal((await ravi.client.request('GET', `/api/opportunities/${deal.id}`)).body.stage, 'new_prospect', 'a draft quotation does not advance the deal');
+  assert.equal((await ravi.client.request('GET', `/api/opportunities/${deal.id}`)).body.stage, 'create', 'a draft quotation does not advance the deal');
 
   const sent = await office.request('PUT', `/api/quotation-links/${draft.body.id}`, { status: 'sent', quotation_date: '2026-10-20' });
   assert.equal(sent.status, 200);
   const after = (await ravi.client.request('GET', `/api/opportunities/${deal.id}`)).body;
-  assert.equal(after.stage, 'quotation_sent');
+  assert.equal(after.stage, 'prove');
   assert.equal(after.probability, 25, 'moving stage keeps the probability the salesperson chose');
-  assert.equal(after.history[0].to_value, 'quotation_sent');
+  assert.equal(after.history[0].to_value, 'prove');
 
   const dup = await office.request('POST', `/api/opportunities/${deal.id}/quotations`, { quotation_number: 'QTN-100' });
   assert.equal(dup.status, 409);
@@ -152,9 +152,9 @@ test('winning needs a value, losing needs a reason, and both are audited', async
 test('only a manager can reopen a closed deal; reopening clears the result', async () => {
   const deal = await openDeal(ravi.client);
   await ravi.client.request('POST', `/api/opportunities/${deal.id}/stage`, { stage: 'lost', lost_reason: 'timing', close_reason: 'Budget frozen' });
-  assert.equal((await ravi.client.request('POST', `/api/opportunities/${deal.id}/stage`, { stage: 'qualified' })).status, 403);
+  assert.equal((await ravi.client.request('POST', `/api/opportunities/${deal.id}/stage`, { stage: 'qualify' })).status, 403);
   assert.equal((await manager.request('POST', `/api/opportunities/${deal.id}/stage`, { stage: 'won', won_value: 1, close_reason: 'x' })).status, 400, 'reopen to an open stage first');
-  const reopened = await manager.request('POST', `/api/opportunities/${deal.id}/stage`, { stage: 'qualified', note: 'Budget approved after all' });
+  const reopened = await manager.request('POST', `/api/opportunities/${deal.id}/stage`, { stage: 'qualify', note: 'Budget approved after all' });
   assert.equal(reopened.status, 200);
   assert.equal(reopened.body.closed_at, null);
   assert.equal(reopened.body.lost_reason, null);
@@ -168,7 +168,7 @@ test('history is append-only and the database enforces closed-deal rules', async
   await assert.rejects(query(`UPDATE opportunity_history SET note = 'x' WHERE opportunity_id = $1`, [deal.id]), /append-only/);
   await assert.rejects(query(`UPDATE opportunity SET stage = 'won', closed_at = NOW(), probability = 100, close_reason = 'x' WHERE id = $1`, [deal.id]), /opportunity_won_has_value/);
   await assert.rejects(query(`UPDATE opportunity SET stage = 'lost', closed_at = NOW(), close_reason = 'x' WHERE id = $1`, [deal.id]), /opportunity_lost_has_reason/);
-  await assert.rejects(query(`UPDATE opportunity SET stage = 'abandoned', closed_at = NOW() WHERE id = $1`, [deal.id]), /opportunity_closed_has_written_reason/);
+  await assert.rejects(query(`UPDATE opportunity SET stage = 'lost', lost_reason = 'price', closed_at = NOW() WHERE id = $1`, [deal.id]), /opportunity_closed_has_written_reason/);
   await assert.rejects(query(`UPDATE opportunity SET probability = 40 WHERE id = $1`, [deal.id]), /opportunity_open_probability/);
 });
 

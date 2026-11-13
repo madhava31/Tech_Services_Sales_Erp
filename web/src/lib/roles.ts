@@ -32,8 +32,9 @@ export function canRecordQuotations(role: Role | undefined) {
 }
 
 // Mirrors api/routes/catalogue.js. Managing OEMs and market segments is isAdminRole.
+// Only Admin adds and edits products.
 export function canManageProducts(role: Role | undefined) {
-  return role === 'admin' || role === 'managing_director' || role === 'office_staff';
+  return role === 'admin';
 }
 
 // Salespeople keep their own; managers and the office keep anyone's. Mirrors api/routes/repeat.js.

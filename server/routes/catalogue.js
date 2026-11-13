@@ -9,11 +9,11 @@ import { erpAdapter } from '../erp/adapter.js';
 // Mounted at /api/products, /api/oems and /api/market-segments. Everyone signed in can read the
 // catalogue. Rows are never deleted: anything in use is deactivated with is_active.
 
-// Admin/MD and office staff keep the product list; only Admin/MD manage OEMs and segments.
-const PRODUCT_ROLES = ['admin', 'managing_director', 'office_staff'];
+// Only Admin adds and edits products; only Admin/MD manage OEMs and segments.
+const PRODUCT_ROLES = ['admin'];
 
 function requireProductRole(req, res, next) {
-  if (!PRODUCT_ROLES.includes(req.user.role)) return res.status(403).json({ error: 'Products are managed by the office or an administrator.' });
+  if (!PRODUCT_ROLES.includes(req.user.role)) return res.status(403).json({ error: 'Only an admin can add or change products.' });
   next();
 }
 
@@ -198,7 +198,7 @@ export const oemsRouter = nameListRouter({
   table: 'oem',
   entity: 'oem',
   label: 'OEM',
-  inUseSql: `(SELECT COUNT(*) FROM opportunity o WHERE o.oem_id = t.id) + (SELECT COUNT(*) FROM product p WHERE p.oem_id = t.id)`,
+  inUseSql: `(SELECT COUNT(*) FROM opportunity_oem oo WHERE oo.oem_id = t.id) + (SELECT COUNT(*) FROM product p WHERE p.oem_id = t.id)`,
 });
 
 export const segmentsRouter = nameListRouter({

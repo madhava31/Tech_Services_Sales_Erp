@@ -86,7 +86,7 @@ export default function Team() {
 
       {t && (
         <div className="ts-grid grid-cols-2 min-[1101px]:grid-cols-6">
-          <Tile i={0} label="Won" value={formatMoney(t.won_value, { compact: true })} hint={`${t.deals_won} opportunities · ${t.deals_lost} lost · ${t.deals_abandoned} abandoned`} tone="ok" />
+          <Tile i={0} label="Won" value={formatMoney(t.won_value, { compact: true })} hint={`${t.deals_won} opportunities · ${t.deals_lost} lost`} tone="ok" />
           <Tile i={1} label="Pipeline" value={formatMoney(t.pipeline_value, { compact: true })} hint={`${t.open_deals} open · weighted ${formatMoney(t.weighted_pipeline, { compact: true })}`} />
           <Tile i={2} label="Opportunities" value={t.visits} hint={`${t.companies_visited} companies · ${t.new_prospects} new`} />
           <Tile i={3} label="Overdue opportunities" value={t.overdue_deals} tone={t.overdue_deals ? 'danger' : undefined} hint="Past expected closing date" />
@@ -129,7 +129,7 @@ export default function Team() {
                     <b className="text-ink">{p.metrics.open_deals}</b> open
                   </span>
                   <span>
-                    <b className="text-ink">{p.metrics.deals_lost}</b> lost · <b className="text-ink">{p.metrics.deals_abandoned}</b> aband.
+                    <b className="text-ink">{p.metrics.deals_lost}</b> lost
                   </span>
                   <span className={p.metrics.overdue_deals ? 'text-danger font-medium' : ''}>{p.metrics.overdue_deals} opportunities overdue</span>
                   <span className={p.metrics.stuck_deals ? 'text-warn font-medium' : ''}>{p.metrics.stuck_deals} stuck</span>
@@ -144,7 +144,7 @@ export default function Team() {
               <thead>
                 <tr>
                   <th>Salesperson</th>
-                  {['Opportunities', 'Open', 'Pipeline', 'Weighted', 'Overdue opportunities', 'Stuck', 'Won', 'Won value', 'Lost', 'Abandoned', 'Quote req.', 'Overdue tasks'].map((h) => (
+                  {['Opportunities', 'Open', 'Pipeline', 'Weighted', 'Overdue opportunities', 'Stuck', 'Won', 'Won value', 'Lost', 'Quote req.', 'Overdue tasks'].map((h) => (
                     <th key={h} className="ts-r">
                       {h}
                     </th>
@@ -166,7 +166,6 @@ export default function Team() {
                     <td className="ts-r">{p.metrics.deals_won}</td>
                     <td className="ts-r">{formatMoney(p.metrics.won_value, { compact: true })}</td>
                     <td className="ts-r">{p.metrics.deals_lost}</td>
-                    <td className="ts-r">{p.metrics.deals_abandoned}</td>
                     <td className="ts-r">{p.metrics.quotation_requests}</td>
                     <td className={`ts-r ${p.metrics.overdue_follow_ups ? 'text-danger font-medium' : ''}`}>{p.metrics.overdue_follow_ups}</td>
                   </tr>
@@ -185,7 +184,6 @@ export default function Team() {
                     <td className="ts-r">{t.deals_won}</td>
                     <td className="ts-r">{formatMoney(t.won_value, { compact: true })}</td>
                     <td className="ts-r">{t.deals_lost}</td>
-                    <td className="ts-r">{t.deals_abandoned}</td>
                     <td className="ts-r">{t.quotation_requests}</td>
                     <td className="ts-r">{t.overdue_follow_ups}</td>
                   </tr>

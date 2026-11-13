@@ -142,6 +142,8 @@ function NewCompanyForm({
         contact: form.contact_person.trim() ? { name: form.contact_person.trim(), designation: contact.designation, department: contact.department } : undefined,
         parent_company_id: parent?.id,
       });
+      // "Sent for approval" pops up at once rather than at the next check.
+      window.dispatchEvent(new Event('notifications-check'));
       onCreated(created);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save the company.');

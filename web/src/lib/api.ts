@@ -79,6 +79,8 @@ export interface UserAssignment {
 export interface Salesperson {
   id: number;
   employee_code: string;
+  // The letters in their opportunity IDs: TS-G-0001.
+  id_prefix: string;
   name: string;
   phone: string | null;
   email: string | null;
@@ -89,7 +91,7 @@ export interface Salesperson {
   user_is_active: boolean | null;
 }
 
-export type SalespersonInput = Pick<Salesperson, 'employee_code' | 'name' | 'phone' | 'email' | 'erp_sales_engineer_id'>;
+export type SalespersonInput = Pick<Salesperson, 'employee_code' | 'name' | 'phone' | 'email' | 'erp_sales_engineer_id'> & { id_prefix?: string };
 
 export interface AuditEntry {
   id: number;
@@ -243,9 +245,12 @@ export const api = {
     complete: (id: number, outcome_notes?: string) => post<Task>(`/tasks/${id}/complete`, { outcome_notes }),
     cancel: (id: number, reason: string) => post<Task>(`/tasks/${id}/cancel`, { reason }),
   },
+  // The universal search in the top bar.
+  search: (q: string) => request<SearchResults>(`/search${qs({ q })}`),
   opportunities: {
     list: (params: DealFilters = {}) => request<Opportunity[]>(`/opportunities${qs({ ...params })}`),
-    exportUrl: (params: DealFilters = {}) => `/api/opportunities/export.xlsx${qs({ ...params })}`,
+    exportUrl: (params: DealFilters & { columns?: string } = {}) => `/api/opportunities/export.xlsx${qs({ ...params })}`,
+    exportColumns: () => request<{ key: string; label: string }[]>('/opportunities/export-columns'),
     erpQuotations: (id: number) => request<ErpQuotation[]>(`/opportunities/${id}/erp-quotations`),
     bulk: (data: { ids: number[]; expected_close_date?: string; stage?: Stage; to_salesperson_id?: number; reason?: string }) => post<BulkResult>('/opportunities/bulk', data),
     quotationRequests: () => request<Opportunity[]>('/opportunities/quotation-requests'),
@@ -348,7 +353,7 @@ export interface Funnel {
   days: number;
   today: string;
   total: number;
-  lost_or_abandoned: number;
+  lost: number;
   stages: { stage: Stage; reached: number; reached_value: number; open_now: number; dropped: number; to_next_pct: number | null; avg_days: number | null }[];
   open_by_stage: { stage: Stage; deals: number; value: number }[];
 }
@@ -593,21 +598,14 @@ export interface HandoverPreview {
 
 // ---------- Pipeline ----------
 
-export type Stage =
-  | 'new_prospect'
-  | 'visit_completed'
-  | 'qualified'
-  | 'quotation_requested'
-  | 'quotation_sent'
-  | 'negotiation'
-  | 'won'
-  | 'lost'
-  | 'abandoned';
+export type Stage = 'create' | 'qualify' | 'develop' | 'prove' | 'negotiation' | 'won' | 'lost';
+export type Competitor = 'no_idea' | 'no_competitor' | 'other';
 export type LostReason = 'price' | 'competitor' | 'no_budget' | 'no_requirement' | 'timing' | 'product_fit' | 'no_response' | 'other';
 export type QuotationStatus = 'draft' | 'sent' | 'accepted' | 'rejected';
 
 export interface Opportunity {
   id: number;
+  code: string;
   company_id: number;
   company_name: string;
   company_city: string | null;
@@ -621,12 +619,15 @@ export interface Opportunity {
   probability: number;
   probability_reason: string | null;
   tender: boolean;
-  oem_id: number | null;
+  oems: { id: number; name: string; is_active: boolean }[];
+  // The OEM names, joined: "Anton Paar, PerkinElmer".
   oem_name: string | null;
+  competitor: Competitor | null;
+  competitor_note: string | null;
   contact_id: number | null;
   contact_name: string | null;
   contact_phone: string | null;
-  products: { id: number; part_number: string; name: string; is_active: boolean }[];
+  products: { id: number; part_number: string; name: string; oem_id: number; is_active: boolean }[];
   segments: { id: number; name: string; is_active: boolean }[];
   is_overdue: boolean;
   is_stuck: boolean;
@@ -645,7 +646,7 @@ export interface Opportunity {
 }
 
 export interface DealFilters {
-  status?: 'open' | 'won' | 'lost' | 'abandoned' | 'closed' | 'all';
+  status?: 'open' | 'won' | 'lost' | 'closed' | 'all';
   stage?: string;
   company_id?: number;
   owner_id?: number | '';
@@ -657,8 +658,16 @@ export interface DealFilters {
 
 export interface DealInput {
   title: string;
-  oem_id: number;
+  oem_ids: number[];
   product_ids: number[];
+  competitor: Competitor | null;
+  competitor_note: string | null;
+  // Only when creating: the stage it starts at, and what that stage needs.
+  stage?: Stage;
+  quotation_number?: string;
+  won_value?: number;
+  lost_reason?: LostReason;
+  close_reason?: string;
   expected_close_date: string;
   estimated_value: number;
   probability: number;
@@ -733,7 +742,6 @@ export interface Performance {
   deals_won: number;
   won_value: number;
   deals_lost: number;
-  deals_abandoned: number;
   win_rate: number | null;
   avg_days_to_win: number | null;
   lost_reasons: { reason: LostReason; count: number }[];
@@ -912,6 +920,7 @@ export interface CompanyDetail extends CompanySummary {
   requirements: Requirement[];
   opportunities: {
     id: number;
+    code: string;
     title: string;
     stage: Stage;
     estimated_value: number | null;
@@ -935,4 +944,13 @@ export interface TodayData {
   draft_visits: { id: number; local_uuid?: string; visited_at: string; company_id: number; company_name: string; salesperson_name: string }[];
   recent_visits: { id: number; visited_at: string; outcome: Outcome; company_id: number; company_name: string; salesperson_name: string }[];
   stats: { visits_this_week: number; companies_visited_30d: number; quotation_requests_30d: number; overdue_follow_ups: number };
+}
+
+// ---------- Universal search ----------
+
+export interface SearchResults {
+  q: string;
+  opportunities: { id: number; code: string; title: string; stage: Stage; estimated_value: number | null; won_value: number | null; company_name: string; owner_name: string }[];
+  companies: { id: number; name: string; city: string | null; approval_status: string }[];
+  contacts: { id: number; name: string; phone: string | null; designation: string | null; department: string | null; company_id: number; company_name: string }[];
 }

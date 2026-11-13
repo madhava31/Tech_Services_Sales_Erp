@@ -21,6 +21,7 @@ export default function Approvals() {
     try {
       await action();
       setNotice(done);
+      window.dispatchEvent(new Event('notifications-check'));
       setRejecting(null);
       setReason('');
       await list.reload();

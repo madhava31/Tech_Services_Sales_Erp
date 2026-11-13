@@ -8,7 +8,7 @@ import { recordAudit } from '../audit/log.js';
 const router = Router();
 
 const SALESPERSON_SELECT = `
-  SELECT sp.id, sp.employee_code, sp.name, sp.phone, sp.email, sp.is_active, sp.erp_sales_engineer_id,
+  SELECT sp.id, sp.employee_code, sp.id_prefix, sp.name, sp.phone, sp.email, sp.is_active, sp.erp_sales_engineer_id,
          sp.created_at, sp.updated_at, u.id AS user_id, u.username, u.is_active AS user_is_active
   FROM salesperson sp
   LEFT JOIN app_user u ON u.salesperson_id = sp.id`;
@@ -20,6 +20,7 @@ function loadSalesperson(id) {
 function auditSnapshot(sp) {
   return {
     employee_code: sp.employee_code,
+    id_prefix: sp.id_prefix,
     name: sp.name,
     phone: sp.phone,
     email: sp.email,
@@ -53,11 +54,19 @@ function parseFields(body, { partial }) {
     if ((!partial || fields[key] !== undefined) && !fields[key]) return { error: `${key} is required` };
   }
   if (fields.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fields.email)) return { error: 'email is not valid' };
+  // The letters in this person's opportunity IDs (TS-G-0001). Left out on create, they come from the
+  // name; changing them only affects IDs given from then on.
+  if (body.id_prefix !== undefined && body.id_prefix !== null && body.id_prefix !== '') {
+    const prefix = String(body.id_prefix).trim().toUpperCase();
+    if (!/^[A-Z][A-Z0-9]{0,3}$/.test(prefix)) return { error: 'ID letters must start with a letter and be 1 to 4 letters or digits, such as G or GA.' };
+    fields.id_prefix = prefix;
+  }
   return { fields };
 }
 
 function uniqueViolationMessage(err) {
   if (err.constraint === 'salesperson_erp_sales_engineer_id_key') return 'That ERP sales engineer is already linked to another salesperson.';
+  if (err.constraint === 'salesperson_id_prefix_key') return 'Another salesperson already has those ID letters.';
   return 'That employee code is already in use.';
 }
 
@@ -76,10 +85,10 @@ router.post('/', async (req, res) => {
     const created = await db.transaction(async () => {
       const info = await db
         .prepare(
-          `INSERT INTO salesperson (employee_code, name, phone, email, erp_sales_engineer_id)
-           VALUES (?, ?, ?, ?, ?) RETURNING id`
+          `INSERT INTO salesperson (employee_code, name, phone, email, erp_sales_engineer_id, id_prefix)
+           VALUES (?, ?, ?, ?, ?, ?) RETURNING id`
         )
-        .run(fields.employee_code, fields.name, fields.phone ?? null, fields.email ?? null, fields.erp_sales_engineer_id ?? null);
+        .run(fields.employee_code, fields.name, fields.phone ?? null, fields.email ?? null, fields.erp_sales_engineer_id ?? null, fields.id_prefix ?? null);
       const sp = await loadSalesperson(info.lastInsertRowid);
       await recordAudit({
         actorUserId: req.user.id,
@@ -111,10 +120,10 @@ router.put('/:id', async (req, res) => {
     const updated = await db.transaction(async () => {
       await db
         .prepare(
-          `UPDATE salesperson SET employee_code = ?, name = ?, phone = ?, email = ?, erp_sales_engineer_id = ?, updated_at = NOW()
+          `UPDATE salesperson SET employee_code = ?, name = ?, phone = ?, email = ?, erp_sales_engineer_id = ?, id_prefix = ?, updated_at = NOW()
            WHERE id = ?`
         )
-        .run(merged.employee_code, merged.name, merged.phone, merged.email, merged.erp_sales_engineer_id, id);
+        .run(merged.employee_code, merged.name, merged.phone, merged.email, merged.erp_sales_engineer_id, merged.id_prefix, id);
       const sp = await loadSalesperson(id);
       await recordAudit({
         actorUserId: req.user.id,
@@ -150,7 +159,7 @@ async function setActive(req, res, active) {
     if (!active) {
       const open = await db
         .prepare(
-          `SELECT (SELECT COUNT(*)::int FROM opportunity WHERE owner_salesperson_id = ? AND stage NOT IN ('won', 'lost', 'abandoned')) AS deals,
+          `SELECT (SELECT COUNT(*)::int FROM opportunity WHERE owner_salesperson_id = ? AND stage NOT IN ('won', 'lost')) AS deals,
                   (SELECT COUNT(*)::int FROM task WHERE assignee_salesperson_id = ? AND status = 'open') AS tasks,
                   (SELECT COUNT(*)::int FROM installed_instrument WHERE salesperson_id = ? AND is_active) + (SELECT COUNT(*)::int FROM reorder_plan WHERE salesperson_id = ? AND is_active) AS accounts`
         )

@@ -8,7 +8,7 @@ import { DAYS_IN_STAGE_SQL, STUCK_SQL } from './stuck.js';
 // The Monday report for management: last week's results, where the pipeline stands, and what needs
 // attention this week. Kept in the app for everyone with the team view, and emailed if email is set up.
 
-const OPEN = `o.stage NOT IN ('won', 'lost', 'abandoned')`;
+const OPEN = `o.stage NOT IN ('won', 'lost')`;
 const TOP = 5;
 
 // The last finished week, Monday to Sunday, India time.
@@ -145,7 +145,7 @@ export function reportEmail(report) {
   <table style="border-collapse:collapse;width:100%">
     <tr><td style="${cell}">Orders won</td><td style="${num}"><b>${esc(money(t.won_value))}</b> (${t.deals_won})</td></tr>
     <tr><td style="${cell}">Opportunities</td><td style="${num}">${t.visits}</td></tr>
-    <tr><td style="${cell}">Opportunities lost / abandoned</td><td style="${num}">${t.deals_lost} / ${t.deals_abandoned}</td></tr>
+    <tr><td style="${cell}">Opportunities lost</td><td style="${num}">${t.deals_lost}</td></tr>
     <tr><td style="${cell}">Open pipeline</td><td style="${num}">${esc(money(t.pipeline_value))} (${t.open_deals} opportunities), weighted ${esc(money(t.weighted_pipeline))}</td></tr>
     <tr><td style="${cell}">Past closing date / stuck</td><td style="${num}">${t.overdue_deals} / ${t.stuck_deals}</td></tr>
   </table>
@@ -202,7 +202,7 @@ export async function runWeeklyReport({ push = null, sendEmail } = {}) {
     const row = await db
       .prepare(
         `INSERT INTO notification (user_id, kind, for_date, title, body, url) VALUES (?, 'weekly_report', ?, ?, ?, '/reports')
-         ON CONFLICT (user_id, kind, for_date) DO NOTHING RETURNING id`
+         ON CONFLICT (user_id, kind, for_date) WHERE kind IN ('daily_digest', 'weekly_report') DO NOTHING RETURNING id`
       )
       .get(id, week.from_date, title, body);
     if (row && push) await push(id, { title, body, url: '/reports' });
