@@ -7,6 +7,7 @@ import cookieParser from 'cookie-parser';
 import db from './db/index.js';
 
 import { requireAuth, requireAdmin } from './auth/middleware.js';
+import cronRouter from './routes/cron.js';
 import authRouter from './routes/auth.js';
 import usersRouter from './routes/users.js';
 import salespeopleRouter from './routes/salespeople.js';
@@ -87,19 +88,18 @@ app.use((req, res, next) => {
 
 app.get('/api/health', async (req, res) => {
   let dbOk = false;
-  let dbError = null;
   try {
     const row = await db.prepare('SELECT 1 as connected').get();
     dbOk = Boolean(row?.connected);
   } catch (err) {
-    dbError = err.message;
+    // The reason goes to the server log (Vercel → Logs), not to whoever opens this page.
+    console.error('Health check: database not reachable:', err.message);
   }
-  res.json({
-    ok: true,
-    database: dbOk,
-    ...(dbError ? { dbError } : {}),
-  });
+  res.json({ ok: true, database: dbOk });
 });
+
+// Scheduled jobs on Vercel, signed with CRON_SECRET rather than a login.
+app.use('/api/cron', cronRouter);
 
 app.use('/api/auth', authRouter);
 

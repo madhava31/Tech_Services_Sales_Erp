@@ -2,6 +2,13 @@
   "installCommand": "npm install && npm --prefix web install",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "functions": {
+    "api/index.js": { "maxDuration": 60 }
+  },
+  "crons": [
+    { "path": "/api/cron/erp-sync", "schedule": "30 1 * * *" },
+    { "path": "/api/cron/reminders", "schedule": "15 4 * * *" }
+  ],
   "rewrites": [
     {
       "source": "/api/(.*)",
