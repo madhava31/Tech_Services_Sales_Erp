@@ -133,6 +133,15 @@ export async function runDailyReminders({ send = sendPush } = {}) {
   return result;
 }
 
+// What one scheduled run does: from the working morning on (not Sundays), the daily digest and, once a
+// week, the weekly report. Awaited, so a serverless run finishes its work before it ends.
+export async function runReminderJob({ now = new Date() } = {}) {
+  if (!isReminderTime(now)) return { skipped: true };
+  const digest = await runDailyReminders();
+  const report = await runWeeklyReport({ push: pushToUser });
+  return { digest, report: { created: Boolean(report?.created) } };
+}
+
 function isReminderTime(now = new Date()) {
   const ist = new Date(now.getTime() + 330 * 60000);
   return ist.getUTCDay() !== 0 && ist.getUTCHours() >= REMINDER_HOUR_IST;
@@ -141,9 +150,7 @@ function isReminderTime(now = new Date()) {
 // Needs one long-running process, which is how production is planned (docs/architecture-plan.md §2).
 export function startReminderSchedule() {
   const tick = () => {
-    if (!isReminderTime()) return;
-    runDailyReminders().catch((err) => console.error('Reminders failed:', err));
-    runWeeklyReport({ push: pushToUser }).catch((err) => console.error('Weekly report failed:', err));
+    runReminderJob().catch((err) => console.error('Reminders failed:', err));
   };
   tick();
   return setInterval(tick, CHECK_EVERY_MS);
