@@ -59,11 +59,6 @@ async function main() {
         SELECT id FROM opportunity WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)')
       ) RETURNING opportunity_id
     `);
-    await q(`
-      DELETE FROM opportunity_custom_product WHERE opportunity_id IN (
-        SELECT id FROM opportunity WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)')
-      )
-    `);
     const delOppSeg = await q(`
       DELETE FROM opportunity_segment WHERE opportunity_id IN (
         SELECT id FROM opportunity WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)')
