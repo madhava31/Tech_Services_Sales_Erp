@@ -273,7 +273,7 @@ export default function DealDetail() {
             [
               ['Created', formatDate(d.created_at)],
               [d.oems.length > 1 ? 'OEMs' : 'OEM', d.oem_name],
-              ['Products', d.products.map((p) => p.name).join(', ')],
+              ['Products', [...d.products, ...(d.custom_products ?? [])].map((p) => p.name).join(', ')],
               ['Win probability', `${d.probability}%${d.probability_reason ? ` · ${d.probability_reason}` : ''}`],
               ['Competitor', competitorText(d.competitor, d.competitor_note)],
               ['Tender', d.tender ? 'Yes' : 'No'],

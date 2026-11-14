@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { XIcon } from 'lucide-react';
+import { PlusIcon, XIcon } from 'lucide-react';
 import { api, Competitor, Contact, DealInput, LostReason, NamedOption, OpportunityDetail, Product } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { COMPETITOR_LABELS, LOST_REASON_LABELS, OPEN_STAGES, QUOTED_STAGES, STAGE_LABELS, formatDate, formatMoney, formatIndianDigits } from '../lib/labels';
@@ -17,6 +17,8 @@ export interface DealDraft {
   newContact: { phone: string; name: string; designation: string; department?: string; email: string };
   oemIds: string[];
   productIds: number[];
+  // Products typed in for this opportunity only, under one of its OEMs.
+  customProducts: { oemId: string; name: string }[];
   closeDate: string;
   probability: number;
   probabilityReason: string;
@@ -41,6 +43,7 @@ export const EMPTY_DEAL_DRAFT: DealDraft = {
   newContact: { phone: '', name: '', designation: '', department: '', email: '' },
   oemIds: [],
   productIds: [],
+  customProducts: [],
   closeDate: '',
   probability: 25,
   probabilityReason: '',
@@ -65,6 +68,7 @@ export function dealToDraft(deal: OpportunityDetail): DealDraft {
     contactId: deal.contact_id ? String(deal.contact_id) : '',
     oemIds: deal.oems.map((o) => String(o.id)),
     productIds: deal.products.map((p) => p.id),
+    customProducts: (deal.custom_products ?? []).map((p) => ({ oemId: String(p.oem_id), name: p.name })),
     closeDate: deal.expected_close_date ?? '',
     probability: deal.probability,
     probabilityReason: deal.probability_reason ?? '',
@@ -87,6 +91,7 @@ export function draftToInput(d: DealDraft): DealInput {
     title: d.title,
     oem_ids: d.oemIds.map(Number),
     product_ids: d.productIds,
+    custom_products: (d.customProducts ?? []).map((p) => ({ oem_id: Number(p.oemId), name: p.name })),
     expected_close_date: d.closeDate,
     probability: d.probability,
     probability_reason: d.probabilityReason || null,
@@ -125,7 +130,7 @@ export function dealDraftComplete(d: DealDraft) {
   } else if (QUOTED_STAGES.includes(d.stage as never)) {
     stageOk = d.quotationNumber.trim() !== '';
   }
-  return Boolean(d.title.trim() && d.oemIds.length > 0 && d.productIds.length > 0 && d.closeDate && Number(d.value) > 0 && contactOk && competitorOk && stageOk);
+  return Boolean(d.title.trim() && d.oemIds.length > 0 && d.productIds.length + (d.customProducts ?? []).length > 0 && d.closeDate && Number(d.value) > 0 && contactOk && competitorOk && stageOk);
 }
 
 function CheckList<T extends { id: number }>({
@@ -197,6 +202,73 @@ function Segmented<T extends string | number | boolean>({ label, options, value,
 
 type ProductChoice = { id: number; name: string; part_number: string; oem_id: number };
 
+// "Other product": a name typed in for this opportunity only. It is saved with the opportunity and never
+// reaches the product catalogue. Shown under each chosen OEM, with the products already added.
+function OtherProducts({ oem, items, onAdd, onRemove }: { oem: NamedOption; items: string[]; onAdd: (name: string) => void; onRemove: (name: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const trimmed = name.trim().replace(/s+/g, ' ');
+  const taken = items.some((n) => n.toLowerCase() === trimmed.toLowerCase());
+  const add = () => {
+    if (!trimmed || taken) return;
+    onAdd(trimmed);
+    setName('');
+  };
+  return (
+    <div className="flex flex-col gap-2 min-w-0">
+      {items.length > 0 && (
+        <div className="flex flex-col gap-1.5" aria-label={`Other ${oem.name} products on this opportunity`}>
+          <span className="ts-lbl">Other {oem.name} products (this opportunity only)</span>
+          <div className="flex flex-wrap gap-2">
+            {items.map((n) => (
+              <span key={n} className="inline-flex items-center gap-1 rounded-full bg-tile pl-3 pr-1 py-1 text-sm font-medium max-w-full">
+                <span className="truncate">{n}</span>
+                <button type="button" onClick={() => onRemove(n)} className={`inline-flex items-center justify-center rounded-full size-7 hover:bg-surface ${PHONE_TOUCH} max-[860px]:min-w-11`} aria-label={`Remove ${n}`}>
+                  <XIcon className="size-3.5" aria-hidden="true" />
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      {!open ? (
+        <div>
+          <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(true)}>
+            <PlusIcon className="size-4" aria-hidden="true" /> Add other {oem.name} product
+          </Button>
+        </div>
+      ) : (
+        <div className="p-3 border border-line rounded-lg bg-surface flex flex-col gap-2.5">
+          <TextField
+            label={`Other ${oem.name} product`}
+            value={name}
+            maxLength={120}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                add();
+              }
+            }}
+            placeholder="Type the product name"
+            hint="Saved on this opportunity only. It is not added to the product list."
+            autoFocus
+          />
+          {taken && <p className="text-xs text-danger">Already added.</p>}
+          <div className="flex gap-2">
+            <Button type="button" size="sm" disabled={!trimmed || taken} onClick={add}>
+              Add
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => { setOpen(false); setName(''); }}>
+              Done
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Adds a product to one OEM's list, for those who manage the catalogue.
 function AddProduct({ oem, onAdded }: { oem: NamedOption; onAdded: (p: Product) => void }) {
   const [open, setOpen] = useState(false);
@@ -207,7 +279,7 @@ function AddProduct({ oem, onAdded }: { oem: NamedOption; onAdded: (p: Product) 
   if (!open) {
     return (
       <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(true)}>
-        + Add {oem.name} product
+        + Add {oem.name} product to catalogue
       </Button>
     );
   }
@@ -303,11 +375,16 @@ export default function DealFields({
   const value_ = Number(value.value);
   const closed = value.stage === CLOSED;
 
+  const customProducts = value.customProducts ?? [];
   const addOem = (id: string) => id && !value.oemIds.includes(id) && onChange({ oemIds: [...value.oemIds, id] });
   // Taking an OEM off also takes off its products.
   const removeOem = (id: string) => {
     const theirs = new Set(choicesFor(id).map((p) => p.id));
-    onChange({ oemIds: value.oemIds.filter((x) => x !== id), productIds: value.productIds.filter((p) => !theirs.has(p)) });
+    onChange({
+      oemIds: value.oemIds.filter((x) => x !== id),
+      productIds: value.productIds.filter((p) => !theirs.has(p)),
+      customProducts: customProducts.filter((p) => p.oemId !== id),
+    });
   };
 
   return (
@@ -377,7 +454,8 @@ export default function DealFields({
         value.oemIds.map((oemId) => {
           const oem = oemById(oemId);
           const choices = choicesFor(oemId);
-          const picked = choices.filter((p) => value.productIds.includes(p.id)).length;
+          const others = customProducts.filter((p) => p.oemId === oemId).map((p) => p.name);
+          const picked = choices.filter((p) => value.productIds.includes(p.id)).length + others.length;
           return (
             <div key={oemId} className="ts-span2 min-w-0 flex flex-col gap-2">
               <CheckList
@@ -395,6 +473,14 @@ export default function DealFields({
                 )}
               />
               {value.oemIds.length > 1 && productsByOem[oemId] && picked === 0 && <p className="text-xs text-danger">Choose at least one {oem?.name} product, or remove {oem?.name}.</p>}
+              {oem && (
+                <OtherProducts
+                  oem={oem}
+                  items={others}
+                  onAdd={(name) => onChange({ customProducts: [...customProducts, { oemId, name }] })}
+                  onRemove={(name) => onChange({ customProducts: customProducts.filter((p) => !(p.oemId === oemId && p.name === name)) })}
+                />
+              )}
               {canManage && oem && (
                 <div>
                   <AddProduct
