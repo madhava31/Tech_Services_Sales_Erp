@@ -58,6 +58,8 @@ const OPPORTUNITY_SELECT = `
          (SELECT COUNT(*)::int FROM quotation_link q WHERE q.opportunity_id = o.id) AS quotation_count,
          (SELECT COALESCE(json_agg(json_build_object('id', p.id, 'part_number', p.part_number, 'name', p.name, 'oem_id', p.oem_id, 'is_active', p.is_active) ORDER BY p.name), '[]')
           FROM opportunity_product op JOIN product p ON p.id = op.product_id WHERE op.opportunity_id = o.id) AS products,
+         (SELECT COALESCE(json_agg(json_build_object('id', cp.id, 'name', cp.name, 'oem_id', cp.oem_id) ORDER BY cp.name), '[]')
+          FROM opportunity_custom_product cp WHERE cp.opportunity_id = o.id) AS custom_products,
          (SELECT COALESCE(json_agg(json_build_object('id', s.id, 'name', s.name, 'is_active', s.is_active) ORDER BY s.name), '[]')
           FROM opportunity_segment os JOIN market_segment s ON s.id = os.segment_id WHERE os.opportunity_id = o.id) AS segments
   FROM opportunity o
@@ -214,7 +216,7 @@ router.get('/export.xlsx', requireExcelExport, async (req, res) => {
               {
                 header: `Products (OEM${label})`,
                 width: 40,
-                value: (d) => (d.oems[i] ? d.products.filter((p) => p.oem_id === d.oems[i].id).map((p) => p.name).join(', ') : null),
+                value: (d) => (d.oems[i] ? [...d.products, ...d.custom_products].filter((p) => p.oem_id === d.oems[i].id).map((p) => p.name).join(', ') : null),
               },
             ];
           }).flat()
@@ -451,6 +453,7 @@ router.put('/:id', requireCrmWriter, async (req, res) => {
       oem_ids: currentOems,
       product_ids: Array.isArray(requestedOems) ? opp.products.filter((p) => requestedOems.includes(p.oem_id)).map((p) => p.id) : currentProducts,
       segment_ids: currentSegments,
+      custom_products: Array.isArray(requestedOems) ? opp.custom_products.filter((p) => requestedOems.includes(p.oem_id)) : opp.custom_products,
       contact_id: opp.contact_id,
       ...req.body,
     };
@@ -479,7 +482,7 @@ router.put('/:id', requireCrmWriter, async (req, res) => {
         Comments: d.notes,
         Competitor: d.competitor === 'other' ? d.competitor_note : COMPETITOR_NAMES[d.competitor] ?? null,
         OEM: d.oem_name,
-        Products: names(d.products),
+        Products: names([...d.products, ...d.custom_products]),
         'Market segment': names(d.segments),
         Contact: d.contact_name ? `${d.contact_name}${d.contact_phone ? ` · ${d.contact_phone}` : ''}` : null,
       });

@@ -6,6 +6,29 @@ import { optionalId, optionalNumber, optionalText, requiredDate, requiredText } 
 import { DEFAULT_PROBABILITY, WIN_PROBABILITIES, recordHistory } from './pipeline.js';
 
 export const COMPETITOR_CHOICES = ['no_idea', 'no_competitor', 'other'];
+const MAX_CUSTOM_PRODUCTS = 30;
+
+// Products typed in on this opportunity only: [{ oem_id, name }], each for one of its OEMs.
+function customProductList(body, oemIds) {
+  const list = body?.custom_products;
+  if (list === undefined || list === null) return [];
+  if (!Array.isArray(list)) throw new HttpError(400, 'custom_products must be a list');
+  if (list.length > MAX_CUSTOM_PRODUCTS) throw new HttpError(400, `At most ${MAX_CUSTOM_PRODUCTS} other products on one opportunity.`);
+  const seen = new Set();
+  const out = [];
+  for (const item of list) {
+    const oemId = Number(item?.oem_id);
+    const name = typeof item?.name === 'string' ? item.name.trim().replace(/\s+/g, ' ') : '';
+    if (!name) throw new HttpError(400, 'Enter the product name.');
+    if (name.length > 120) throw new HttpError(400, 'A product name can be at most 120 characters.');
+    if (!oemIds.includes(oemId)) throw new HttpError(400, `"${name}" must be added under one of the chosen OEMs.`);
+    const key = `${oemId}:${name.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ oem_id: oemId, name });
+  }
+  return out;
+}
 
 function idList(body, key) {
   const list = body?.[key];
@@ -47,7 +70,8 @@ export async function parseDealFields(body, { companyId, keepOemIds = [], keepPr
   for (const oem of oems) if (!oem.is_active && !keepOemIds.includes(oem.id)) throw new HttpError(400, `${oem.name} is no longer active.`);
 
   const productIds = idList(body, 'product_ids');
-  if (productIds.length === 0) throw new HttpError(400, 'Choose at least one product.');
+  const customProducts = customProductList(body, oemIds);
+  if (productIds.length === 0 && customProducts.length === 0) throw new HttpError(400, 'Choose at least one product.');
   const products = await db.prepare(`SELECT id, name, oem_id, is_active FROM product WHERE id = ANY(?::int[])`).all(productIds);
   if (products.length !== productIds.length) throw new HttpError(400, 'One of those products was not found.');
   const oemNames = oems.map((o) => o.name).join(' or ');
@@ -56,7 +80,7 @@ export async function parseDealFields(body, { companyId, keepOemIds = [], keepPr
     if (!p.is_active && !keepProductIds.includes(p.id)) throw new HttpError(400, `${p.name} is no longer active.`);
   }
   for (const oem of oems) {
-    if (!products.some((p) => p.oem_id === oem.id)) throw new HttpError(400, `Choose at least one ${oem.name} product, or remove ${oem.name}.`);
+    if (!products.some((p) => p.oem_id === oem.id) && !customProducts.some((p) => p.oem_id === oem.id)) throw new HttpError(400, `Choose at least one ${oem.name} product, or remove ${oem.name}.`);
   }
 
   // Who else is bidding: not known, nobody, or a named competitor.
@@ -93,6 +117,7 @@ export async function parseDealFields(body, { companyId, keepOemIds = [], keepPr
     notes: optionalText(body, 'notes', { max: 5000 }),
     oem_ids: oemIds,
     product_ids: productIds,
+    custom_products: customProducts,
     competitor,
     competitor_note: competitorNote,
     segment_ids: segmentIds,
@@ -107,7 +132,7 @@ export async function resolveDealContact(fields, companyId, userId) {
   return fields.contact_id;
 }
 
-export async function replaceDealLinks(opportunityId, { oem_ids: oemIds, product_ids: productIds, segment_ids: segmentIds }) {
+export async function replaceDealLinks(opportunityId, { oem_ids: oemIds, product_ids: productIds, segment_ids: segmentIds, custom_products: customProducts = [] }) {
   // Link rows carry no history of their own: the change is kept in opportunity_history.
   await db.prepare(`DELETE FROM opportunity_oem WHERE opportunity_id = ?`).run(opportunityId);
   for (const id of oemIds) await db.prepare(`INSERT INTO opportunity_oem (opportunity_id, oem_id) VALUES (?, ?)`).run(opportunityId, id);
@@ -115,6 +140,9 @@ export async function replaceDealLinks(opportunityId, { oem_ids: oemIds, product
   await db.prepare(`DELETE FROM opportunity_segment WHERE opportunity_id = ?`).run(opportunityId);
   for (const id of productIds) await db.prepare(`INSERT INTO opportunity_product (opportunity_id, product_id) VALUES (?, ?)`).run(opportunityId, id);
   for (const id of segmentIds) await db.prepare(`INSERT INTO opportunity_segment (opportunity_id, segment_id) VALUES (?, ?)`).run(opportunityId, id);
+  // Products typed in for this opportunity only.
+  await db.prepare(`DELETE FROM opportunity_custom_product WHERE opportunity_id = ?`).run(opportunityId);
+  for (const p of customProducts) await db.prepare(`INSERT INTO opportunity_custom_product (opportunity_id, oem_id, name) VALUES (?, ?, ?)`).run(opportunityId, p.oem_id, p.name);
 }
 
 // Inserts a deal, its links and its "created" history row, inside the caller's transaction. The

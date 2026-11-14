@@ -628,6 +628,8 @@ export interface Opportunity {
   contact_name: string | null;
   contact_phone: string | null;
   products: { id: number; part_number: string; name: string; oem_id: number; is_active: boolean }[];
+  // Typed in on this opportunity only (not in the catalogue).
+  custom_products: { id: number; name: string; oem_id: number }[];
   segments: { id: number; name: string; is_active: boolean }[];
   is_overdue: boolean;
   is_stuck: boolean;
@@ -660,6 +662,7 @@ export interface DealInput {
   title: string;
   oem_ids: number[];
   product_ids: number[];
+  custom_products?: { oem_id: number; name: string }[];
   competitor: Competitor | null;
   competitor_note: string | null;
   // Only when creating: the stage it starts at, and what that stage needs.
