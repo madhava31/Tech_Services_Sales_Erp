@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { BellIcon, LogOutIcon, PlusIcon } from 'lucide-react';
+import { LogOutIcon, PlusIcon } from 'lucide-react';
 import companyLogo from '../assets/brand/technicon-logo.png';
 import { syncOutbox, useOutbox } from '../lib/outbox';
 import { useAuth } from '../lib/auth';
@@ -9,6 +9,7 @@ import { watchSystemTheme } from '../lib/theme';
 import ConfirmHost from './ConfirmHost';
 import UniversalSearch from './UniversalSearch';
 import NotificationPopups from './NotificationPopups';
+import NotificationBell from './NotificationBell';
 import { Dock } from './layout/Dock';
 import { TopNav } from './layout/TopNav';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './layout/dropdown-menu';
@@ -33,15 +34,6 @@ function SyncBanner() {
   return (
     <Link to="/sync" className={`block mt-3 mx-4 tablet-lg:mx-6 rounded-lg px-4 py-2 text-xs font-medium text-center ${conflicts ? 'bg-danger-soft text-danger' : 'bg-accent-soft text-accent-dark'}`}>
       {parts.join(' · ')}
-    </Link>
-  );
-}
-
-function ReminderBell({ unread }: { unread: number }) {
-  return (
-    <Link to="/notifications" aria-label={unread ? `Reminders, ${unread} new` : 'Reminders'} className="ts-iconbtn">
-      <BellIcon aria-hidden="true" />
-      {unread > 0 && <span className="absolute -top-0.5 -right-0.5 grid place-items-center min-w-[18px] h-[18px] px-1 rounded-full bg-cta text-oncta text-[10px] font-medium">{unread}</span>}
     </Link>
   );
 }
@@ -112,7 +104,7 @@ export default function Layout() {
               <kbd>N</kbd>
             </Link>
           )}
-          <ReminderBell unread={unread} />
+          <NotificationBell unread={unread} />
           {user && (
             <DropdownMenu modal={false}>
               <DropdownMenuTrigger className="ts-iconbtn ts-avatar" aria-label={`Account: ${user.username}`}>
