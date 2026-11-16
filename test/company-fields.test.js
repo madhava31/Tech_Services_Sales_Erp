@@ -34,7 +34,7 @@ test('the category is chosen from the segment list, and only an admin changes th
   const added = await admin.request('POST', '/api/market-segments', { name: 'Cosmetics' });
   assert.equal(added.status, 201);
   const names = (await ravi.client.request('GET', '/api/market-segments')).body.map((s) => s.name);
-  assert.deepEqual(names, ['Pharma', 'Non-pharma', 'Food', 'Research & Analytics', 'Cosmetics'], 'a new one goes after the four');
+  assert.deepEqual(names, ['Pharma', 'Non-pharma', 'Food', 'Research & Academia', 'Cosmetics'], 'a new one goes after the four');
 });
 
 test('pin code is six digits', async () => {

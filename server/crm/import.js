@@ -374,7 +374,7 @@ async function checkDeals(rows, map) {
   const oems = new Map((await db.prepare(`SELECT id, name FROM oem WHERE is_active`).all()).map((o) => [nameKey(o.name), o]));
   const segments = new Map((await db.prepare(`SELECT id, name FROM market_segment WHERE is_active`).all()).map((s) => [nameKey(s.name), s]));
   // Files made before the list was renamed still use the old names.
-  for (const [old, current] of [['R&A', 'Research & Analytics'], ['Applied (non-pharma)', 'Non-pharma'], ['Food (R&A, not R&D)', 'Food']]) {
+  for (const [old, current] of [['R&A', 'Research & Academia'], ['Research & Analytics', 'Research & Academia'], ['Applied (non-pharma)', 'Non-pharma'], ['Food (R&A, not R&D)', 'Food']]) {
     if (!segments.has(nameKey(old)) && segments.has(nameKey(current))) segments.set(nameKey(old), segments.get(nameKey(current)));
   }
   const products = await db.prepare(`SELECT id, part_number, name, oem_id FROM product WHERE is_active`).all();
