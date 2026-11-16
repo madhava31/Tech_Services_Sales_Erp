@@ -176,7 +176,7 @@ test('performance: weighted pipeline uses each deal’s probability; lost and ov
 test('"+ Add customer number": creates, selects an existing contact, or blocks another company’s number', async () => {
   const first = await openDeal(ravi.client, { new_contact: { phone: '+91 98765 11111', name: 'Mr. Rao', designation: 'QC Head', email: 'rao@example.com' } });
   assert.equal(first.contact_name, 'Mr. Rao');
-  assert.equal(first.contact_phone, '+91 98765 11111');
+  assert.equal(first.contact_phone, '9876511111');
   const [contact] = await query(`SELECT company_id FROM company_contact WHERE id = $1`, [first.contact_id]);
   assert.equal(contact.company_id, companyId);
 

@@ -4,7 +4,7 @@ import { api, Competitor, Contact, DealInput, LostReason, NamedOption, Opportuni
 import { useAuth } from '../lib/auth';
 import { COMPETITOR_LABELS, LOST_REASON_LABELS, OPEN_STAGES, QUOTED_STAGES, STAGE_LABELS, formatDate, formatMoney, formatIndianDigits } from '../lib/labels';
 import { canManageProducts } from '../lib/roles';
-import { Button, PHONE_TOUCH, SelectField, TextAreaField, TextField } from './ui';
+import { Button, PHONE_TOUCH, PhoneField, SelectField, TextAreaField, TextField } from './ui';
 
 const NEW_CONTACT = 'new';
 export const WIN_PROBABILITIES = [25, 50, 75, 100];
@@ -406,7 +406,7 @@ export default function DealFields({
         <fieldset className="ts-span2 ts-fgrid ts-g2 !mt-0 rounded-lg border border-line p-3">
           <legend className="ts-lbl !mb-0 px-1">New contact person</legend>
           <TextField label="Name" value={value.newContact.name} onChange={(e) => onChange({ newContact: { ...value.newContact, name: e.target.value } })} required />
-          <TextField label="Phone" type="tel" inputMode="tel" value={value.newContact.phone} onChange={(e) => onChange({ newContact: { ...value.newContact, phone: e.target.value } })} required />
+          <PhoneField label="Phone" value={value.newContact.phone} onChange={(phone) => onChange({ newContact: { ...value.newContact, phone } })} required />
           <TextField label="Designation" value={value.newContact.designation} onChange={(e) => onChange({ newContact: { ...value.newContact, designation: e.target.value } })} />
           <TextField label="Department" value={value.newContact.department ?? ''} onChange={(e) => onChange({ newContact: { ...value.newContact, department: e.target.value } })} />
           <TextField label="Email" type="email" value={value.newContact.email} onChange={(e) => onChange({ newContact: { ...value.newContact, email: e.target.value } })} />

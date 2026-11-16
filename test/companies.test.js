@@ -80,7 +80,7 @@ test('renaming into an existing name is refused; edits are audited', async () =>
   assert.equal(ok.body.name, 'Zeta Pumps');
   const [entry] = await query(`SELECT before, after FROM audit_log WHERE action = 'company.updated' AND entity_id = $1`, [c.id]);
   assert.equal(entry.before.phone, null);
-  assert.equal(entry.after.phone, '020-555-1234');
+  assert.equal(entry.after.phone, '0205551234');
 });
 
 test('contacts can be added, edited and archived but not deleted', async () => {

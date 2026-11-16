@@ -3,13 +3,15 @@ import { recordAudit } from '../audit/log.js';
 import { HttpError } from './access.js';
 import { optionalEmail, optionalText, requiredText } from './fields.js';
 import { phoneKey } from './normalize.js';
+import { checkedPhone } from './phone.js';
 
-export function contactFields(body) {
+// `keepPhone`: the number already saved, accepted as it is when it comes back unchanged.
+export function contactFields(body, { keepPhone = null } = {}) {
   return {
     name: requiredText(body, 'name', { max: 120 }),
     designation: optionalText(body, 'designation', { max: 120 }),
     department: optionalText(body, 'department', { max: 120 }),
-    phone: optionalText(body, 'phone', { max: 30 }),
+    phone: checkedPhone(optionalText(body, 'phone', { max: 30 }), { keep: keepPhone }),
     email: optionalEmail(body, 'email'),
   };
 }

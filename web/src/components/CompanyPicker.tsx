@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, CompanySummary, DuplicateCandidate, NamedOption } from '../lib/api';
-import { Badge, Button, Notice, SelectField, TextField } from './ui';
+import { Badge, Button, Notice, PhoneField, SelectField, TextField } from './ui';
+import { INDIAN_STATES } from '../lib/india';
 
 function useDebounced<T>(value: T, ms = 250) {
   const [debounced, setDebounced] = useState(value);
@@ -176,13 +177,20 @@ function NewCompanyForm({
           ))}
         </SelectField>
         <TextField label="City" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
-        <TextField label="State" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} />
+        <SelectField label="State" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })}>
+          <option value="">Select…</option>
+          {(form.state && !INDIAN_STATES.includes(form.state) ? [form.state, ...INDIAN_STATES] : INDIAN_STATES).map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </SelectField>
         <TextField label="Address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
         <TextField label="Pin code" inputMode="numeric" maxLength={6} value={form.pincode} onChange={(e) => setForm({ ...form, pincode: e.target.value.replace(/\D/g, '') })} />
         <TextField label="Contact person" hint="Saved as a contact, so it can be chosen on opportunities." value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} />
         <TextField label="Designation" value={contact.designation} onChange={(e) => setContact({ ...contact, designation: e.target.value })} />
         <TextField label="Department" value={contact.department} onChange={(e) => setContact({ ...contact, department: e.target.value })} />
-        <TextField label="Company phone" type="tel" inputMode="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+        <PhoneField label="Company phone" value={form.phone} onChange={(phone) => setForm({ ...form, phone })} />
         <TextField label="Company email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
       </div>
 

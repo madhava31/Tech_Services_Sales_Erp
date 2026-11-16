@@ -5,7 +5,7 @@ import { useAuth } from '../../lib/auth';
 import { useOutbox } from '../../lib/outbox';
 import { isManagingRole } from '../../lib/roles';
 import CompanyPicker from '../../components/CompanyPicker';
-import { Button, Card, CardHeader, Notice, PageHeader, SelectField, TextField } from '../../components/ui';
+import { Button, Card, CardHeader, Notice, PageHeader, PhoneField, SelectField, TextField } from '../../components/ui';
 
 // Step 1: pick (or register) the company. Step 2: who you're meeting. Then the draft visit is
 // created and the salesperson finishes it after the meeting on the visit page.
@@ -119,7 +119,7 @@ export default function NewVisit() {
                 <TextField label="Name" value={newContact.name} onChange={(e) => setNewContact({ ...newContact, name: e.target.value })} autoFocus />
                 <TextField label="Designation" value={newContact.designation} onChange={(e) => setNewContact({ ...newContact, designation: e.target.value })} />
                 <TextField label="Department" value={newContact.department} onChange={(e) => setNewContact({ ...newContact, department: e.target.value })} />
-                <TextField label="Phone" type="tel" inputMode="tel" value={newContact.phone} onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })} />
+                <PhoneField label="Phone" value={newContact.phone} onChange={(phone) => setNewContact({ ...newContact, phone })} />
               </div>
             )}
 

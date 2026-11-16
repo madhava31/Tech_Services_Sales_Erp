@@ -7,6 +7,8 @@ import { assertValidParent, mergeCompanies } from '../crm/companies.js';
 import { contactFields, findContactByPhone, insertContact, phoneTakenMessage, addContactPerson } from '../crm/contacts.js';
 import { TODAY_SQL, optionalEmail, optionalId, optionalText, requiredText } from '../crm/fields.js';
 import { addNotifications, approverIds, markHandled, personName, pushNotifications } from '../crm/notify.js';
+import { checkedPhone } from '../crm/phone.js';
+import { listedState } from '../crm/states.js';
 
 // Mounted at /api/companies (signed-in users). The registry itself is shared — everyone must be
 // able to find an existing company — but the visits, tasks and requirements shown on a company
@@ -17,7 +19,8 @@ const router = Router();
 const SIMILARITY_THRESHOLD = 0.4;
 const PHONE_KEY_SQL = `right(regexp_replace(coalesce(c.phone, ''), '[^0-9]', '', 'g'), 10)`;
 
-function companyFields(body, { partial }) {
+// `keep` holds the saved phone and state on an edit: sent back unchanged, they are accepted as they are.
+function companyFields(body, { partial, keep = {} }) {
   const fields = {
     name: partial && body.name === undefined ? undefined : requiredText(body, 'name', { max: 200 }),
     city: body.city === undefined && partial ? undefined : optionalText(body, 'city', { max: 100 }),
@@ -31,6 +34,8 @@ function companyFields(body, { partial }) {
     pincode: body.pincode === undefined && partial ? undefined : optionalText(body, 'pincode', { max: 6 }),
   };
   if (fields.pincode && !/^[0-9]{6}$/.test(fields.pincode)) throw new HttpError(400, 'Pin code must be 6 digits.');
+  if (fields.phone) fields.phone = checkedPhone(fields.phone, { keep: keep.phone, label: 'Company phone' });
+  if (fields.state) fields.state = listedState(fields.state, { keep: keep.state });
   if (fields.gstin) fields.gstin = fields.gstin.toUpperCase();
   return fields;
 }
@@ -406,7 +411,7 @@ router.put('/:id', requireCrmWriter, async (req, res) => {
     const id = Number(req.params.id);
     const existing = await db.prepare(`SELECT * FROM company WHERE id = ? AND archived_at IS NULL`).get(id);
     if (!existing) return res.status(404).json({ error: 'Company not found' });
-    const changes = companyFields(req.body, { partial: true });
+    const changes = companyFields(req.body, { partial: true, keep: { phone: existing.phone, state: existing.state } });
     // An older free-text category can stay as it is; a new one must come from the list.
     if (changes.category !== undefined && changes.category !== existing.category) changes.category = await listedCategory(changes.category);
     const merged = { ...existing };
@@ -469,7 +474,7 @@ contactsRouter.put('/:id', requireCrmWriter, async (req, res) => {
     const id = Number(req.params.id);
     const existing = await db.prepare(`SELECT * FROM company_contact WHERE id = ? AND archived_at IS NULL`).get(id);
     if (!existing) return res.status(404).json({ error: 'Contact not found' });
-    const fields = contactFields({ ...existing, ...req.body });
+    const fields = contactFields({ ...existing, ...req.body }, { keepPhone: existing.phone });
     const owner = await findContactByPhone(fields.phone, { excludeId: id });
     if (owner) throw new HttpError(409, phoneTakenMessage(owner, fields.phone));
     const updated = await db.transaction(async () => {

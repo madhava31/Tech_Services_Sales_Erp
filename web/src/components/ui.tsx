@@ -1,6 +1,7 @@
 import { forwardRef, useId } from 'react';
 import { SearchIcon, XIcon } from 'lucide-react';
 import { CountUp } from './ds/CountUp';
+import { tenDigits } from '../lib/india';
 
 function cx(...classes: (string | false | null | undefined)[]) {
   return classes.filter(Boolean).join(' ');
@@ -42,6 +43,40 @@ function FieldShell({ id, label, hint, children }: { id: string; label: string; 
       {/* Hints carry instructions, so they use the readable grey rather than the ERP's fainter one. */}
       {hint && <p className="ts-hint !text-subtle mt-1.5">{hint}</p>}
     </div>
+  );
+}
+
+// An Indian phone number: the +91 is shown, not typed, and only the 10 digits are kept. Typing or pasting
+// "+91 95026 60090" gives 9502660090, and nothing can run past 10 digits.
+export function PhoneField({
+  label,
+  value,
+  onChange,
+  hint,
+  ...props
+}: Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type'> & { label: string; value: string; onChange: (digits: string) => void; hint?: string }) {
+  const id = useId();
+  const digits = tenDigits(value);
+  const note = digits.length > 0 && digits.length < 10 ? `${digits.length} of 10 digits` : hint;
+  return (
+    <FieldShell id={id} label={label} hint={note}>
+      <div className="flex items-stretch gap-2">
+        <span className="ts-fi !w-auto shrink-0 inline-flex items-center select-none text-ink-muted" aria-label="Country code">
+          +91
+        </span>
+        <input
+          id={id}
+          type="tel"
+          inputMode="numeric"
+          autoComplete="tel-national"
+          placeholder="10-digit number"
+          {...props}
+          value={digits}
+          onChange={(e) => onChange(tenDigits(e.target.value))}
+          className="ts-fi min-w-0 flex-1"
+        />
+      </div>
+    </FieldShell>
   );
 }
 

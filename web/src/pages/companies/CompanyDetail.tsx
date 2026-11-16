@@ -10,7 +10,7 @@ import ContactLogCard from '../../components/ContactLogCard';
 import DealFields, { DealDraft, EMPTY_DEAL_DRAFT, dealDraftComplete, draftToInput } from '../../components/DealFields';
 import OwnerField, { useOwnerChoice } from '../../components/OwnerField';
 import { canWriteCrm, isManagingRole } from '../../lib/roles';
-import { Badge, Button, Card, CardHeader, EmptyState, Notice, OverdueBadge, TextField, LoadingCard } from '../../components/ui';
+import { Badge, Button, Card, CardHeader, EmptyState, Notice, OverdueBadge, PhoneField, TextField, LoadingCard } from '../../components/ui';
 
 function CompanyChooser({
   title,
@@ -308,7 +308,7 @@ function CompanyPage({ id }: { id: number }) {
             <TextField label="Name" value={contact.name} onChange={(e) => setContact({ ...contact, name: e.target.value })} autoFocus required />
             <TextField label="Designation" value={contact.designation} onChange={(e) => setContact({ ...contact, designation: e.target.value })} />
             <TextField label="Department" value={contact.department} onChange={(e) => setContact({ ...contact, department: e.target.value })} />
-            <TextField label="Phone" type="tel" inputMode="tel" value={contact.phone} onChange={(e) => setContact({ ...contact, phone: e.target.value })} />
+            <PhoneField label="Phone" value={contact.phone} onChange={(phone) => setContact({ ...contact, phone })} />
             <TextField label="Email" type="email" value={contact.email} onChange={(e) => setContact({ ...contact, email: e.target.value })} />
             <div className="ts-span2 flex gap-2">
               <Button type="submit" size="sm" disabled={busy || !contact.name.trim()}>
