@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import companyLogo from '../assets/brand/technicon-logo.png';
 import { useAuth } from '../lib/auth';
-import { Button, Notice, TextField } from '../components/ui';
+import { Button, Notice, PasswordField, TextField } from '../components/ui';
 
 function Brand() {
   return (
@@ -96,9 +96,8 @@ export default function SignIn({ mode }: { mode: 'login' | 'setup' }) {
               onChange={(e) => setUsername(e.target.value)}
               required
             />
-            <TextField
+            <PasswordField
               label="Password"
-              type="password"
               autoComplete={isSetup ? 'new-password' : 'current-password'}
               hint={isSetup ? 'At least 8 characters.' : undefined}
               value={password}

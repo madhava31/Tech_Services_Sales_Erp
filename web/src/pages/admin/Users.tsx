@@ -3,7 +3,7 @@ import { api, Salesperson, UserAccount, UserAssignment } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useLoad } from '../../lib/useLoad';
 import { MANAGER_ROLES, ROLE_OPTIONS, Role, isAdminRole, roleLabel } from '../../lib/roles';
-import { Badge, Button, Card, CardHeader, EmptyState, Notice, PageHeader, SelectField, TextField } from '../../components/ui';
+import { Badge, Button, Card, CardHeader, EmptyState, Notice, PageHeader, PasswordField, SelectField, TextField } from '../../components/ui';
 
 const EMPTY_ASSIGNMENT: UserAssignment = { role: 'salesperson', salesperson_id: null, manager_user_id: null };
 
@@ -128,9 +128,8 @@ export default function Users() {
               value={newUser.username}
               onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
             />
-            <TextField
+            <PasswordField
               label="Temporary password"
-              type="password"
               autoComplete="new-password"
               hint="At least 8 characters."
               value={newUser.password}
@@ -237,9 +236,8 @@ export default function Users() {
                         </div>
                       )}
                       {panel.kind === 'password' && (
-                        <TextField
+                        <PasswordField
                           label="New password"
-                          type="password"
                           autoComplete="new-password"
                           hint="At least 8 characters. They will be signed out everywhere."
                           value={panel.password}

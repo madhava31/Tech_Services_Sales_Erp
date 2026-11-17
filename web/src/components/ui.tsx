@@ -1,5 +1,5 @@
-import { forwardRef, useId } from 'react';
-import { SearchIcon, XIcon } from 'lucide-react';
+import { forwardRef, useId, useState } from 'react';
+import { EyeIcon, EyeOffIcon, SearchIcon, XIcon } from 'lucide-react';
 import { CountUp } from './ds/CountUp';
 import { tenDigits } from '../lib/india';
 
@@ -75,6 +75,35 @@ export function PhoneField({
           onChange={(e) => onChange(tenDigits(e.target.value))}
           className="ts-fi min-w-0 flex-1"
         />
+      </div>
+    </FieldShell>
+  );
+}
+
+// A password box with a Show / Hide button, so what was typed can be checked. Hidden again whenever the
+// page is opened afresh.
+export function PasswordField({
+  label,
+  hint,
+  className,
+  ...props
+}: Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'> & { label: string; hint?: string }) {
+  const id = useId();
+  const [shown, setShown] = useState(false);
+  return (
+    <FieldShell id={id} label={label} hint={hint}>
+      <div className="relative">
+        <input id={id} {...props} type={shown ? 'text' : 'password'} className={cx('ts-fi !pr-12', className)} />
+        <button
+          type="button"
+          onClick={() => setShown((s) => !s)}
+          aria-label={shown ? 'Hide password' : 'Show password'}
+          aria-pressed={shown}
+          title={shown ? 'Hide password' : 'Show password'}
+          className="absolute right-0 top-0 h-full min-w-11 grid place-items-center text-ink-muted hover:text-fg rounded-r-ctl"
+        >
+          {shown ? <EyeOffIcon className="size-[18px]" aria-hidden="true" /> : <EyeIcon className="size-[18px]" aria-hidden="true" />}
+        </button>
       </div>
     </FieldShell>
   );
