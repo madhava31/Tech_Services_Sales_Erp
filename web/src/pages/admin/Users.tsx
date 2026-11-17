@@ -37,7 +37,7 @@ function AssignmentFields({
         <option value="">{needsSalesperson ? 'Select…' : 'None'}</option>
         {salespeople.map((s) => (
           <option key={s.id} value={s.id}>
-            {s.name} ({s.employee_code})
+            {s.name} ({s.employee_code}){s.user_id && s.user_is_active === false ? ` — replaces deactivated login ${s.username}` : ''}
           </option>
         ))}
       </SelectField>
@@ -138,7 +138,7 @@ export default function Users() {
             <AssignmentFields
               value={newUser}
               onChange={(v) => setNewUser({ ...newUser, ...v })}
-              salespeople={activeSalespeople.filter((s) => !s.user_id)}
+              salespeople={activeSalespeople.filter((s) => !s.user_id || s.user_is_active === false)}
               managers={managers}
             />
             <div className="flex items-end">

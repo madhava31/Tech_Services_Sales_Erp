@@ -95,6 +95,21 @@ router.post('/', async (req, res) => {
 
     const { salt, hash } = hashPassword(password);
     const created = await db.transaction(async () => {
+      // A salesperson can have one login. If theirs is deactivated, it is released so they can have a new one:
+      // it keeps its history (created_by and the audit log still point at it) but is no longer a salesperson login.
+      if (salespersonId) {
+        const old = await db.prepare(`SELECT id, username, is_active FROM app_user WHERE salesperson_id = ?`).get(salespersonId);
+        if (old && !old.is_active) {
+          await db.prepare(`UPDATE app_user SET salesperson_id = NULL, role = 'office_staff' WHERE id = ?`).run(old.id);
+          await recordAudit({
+            actorUserId: req.user.id,
+            action: 'user.released',
+            entityType: 'app_user',
+            entityId: old.id,
+            summary: `Released the deactivated login "${old.username}" from its salesperson record, for a new login "${username.trim()}"`,
+          });
+        }
+      }
       const info = await db
         .prepare(
           `INSERT INTO app_user (username, password_hash, password_salt, role, salesperson_id, manager_user_id)
