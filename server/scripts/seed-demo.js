@@ -173,7 +173,11 @@ async function main() {
     // The real catalogue if the file is in place, otherwise a small fictional one.
     const csvPath = path.resolve(__dirname, '../db/seeds/technicon_products_seed.csv');
     const [{ c: productCount }] = await q(`SELECT COUNT(*)::int AS c FROM product`);
-    if (fs.existsSync(csvPath)) await upsertProducts(q, parseProductCsv(fs.readFileSync(csvPath, 'utf-8')));
+    if (fs.existsSync(csvPath)) {
+      // Demo data never creates an OEM: only the catalogue rows for OEMs already in the database are loaded.
+      const knownOems = new Set((await q(`SELECT lower(name) AS n FROM oem`)).map((o) => o.n));
+      await upsertProducts(q, parseProductCsv(fs.readFileSync(csvPath, 'utf-8')).filter((r) => knownOems.has(r.make.toLowerCase())));
+    }
     else if (productCount === 0) {
       await upsertProducts(q, DEMO_CATALOGUE.map(([part_number, name, make, category, features]) => ({ part_number, name, make, category, key_features: features.split(' | ') })));
     }
