@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { api, DealFilters, Opportunity } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { STAGE_LABELS, formatDate, formatMoney } from '../../lib/labels';
-import { canWriteCrm } from '../../lib/roles';
+import { canWriteCrm, isManagingRole } from '../../lib/roles';
+import { askConfirm } from '../../lib/confirm';
 import { Badge, DESKTOP_ONLY, EmptyState, Notice, OverdueBadge, PHONE_ONLY, PHONE_TOUCH, PageHeader, SearchBox, SkeletonRows, StuckBadge, rowStagger } from '../../components/ui';
 
 type Status = NonNullable<DealFilters['status']>;
@@ -36,6 +37,19 @@ export default function Opportunities() {
       .then(setRows)
       .catch((err) => setError(err.message));
   }, [view]);
+
+  // The owner or a manager can delete one; a won opportunity stays.
+  const canDelete = (d: Opportunity) =>
+    canWriteCrm(user?.role) && d.stage !== 'won' && (isManagingRole(user?.role) || (user?.salesperson_id != null && user.salesperson_id === d.owner_salesperson_id));
+  async function deleteDeal(d: Opportunity) {
+    if (!(await askConfirm(`Delete "${d.title}" (${d.code})? Its history, quotations and follow-ups are removed. This can’t be undone.`, 'Delete opportunity'))) return;
+    try {
+      await api.opportunities.remove(d.id);
+      setRows((current) => current?.filter((r) => r.id !== d.id) ?? null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not delete the opportunity.');
+    }
+  }
 
   const shown = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -92,6 +106,7 @@ export default function Opportunities() {
                     <th className="ts-r">Value</th>
                     <th>{view === 'open' ? 'Closing date' : 'Closed'}</th>
                     {teamView && <th>Owner</th>}
+                    <th className="ts-r"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -116,6 +131,13 @@ export default function Opportunities() {
                         {view === 'open' ? (d.expected_close_date ? formatDate(d.expected_close_date) : '—') : d.closed_at ? formatDate(d.closed_at) : '—'}
                       </td>
                       {teamView && <td className="ts-muted">{d.owner_name}</td>}
+                      <td className="ts-r">
+                        {canDelete(d) && (
+                          <button type="button" className="ts-lnk text-danger" onClick={() => void deleteDeal(d)}>
+                            Delete
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
