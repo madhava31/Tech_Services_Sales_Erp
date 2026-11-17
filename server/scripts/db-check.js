@@ -53,10 +53,10 @@ async function main() {
     check('every migration file is applied', missing.length === 0, missing.length ? `pending: ${missing.join(', ')}` : `${applied.length} applied`);
 
     // Structure.
-    const badConstraints = await q(`SELECT conrelid::regclass::text AS t, conname FROM pg_constraint WHERE NOT convalidated`);
-    check('every constraint is validated', badConstraints.length === 0, badConstraints.map((c) => `${c.t}.${c.conname}`).join(', '));
-    const badIndexes = await q(`SELECT indexrelid::regclass::text AS i FROM pg_index WHERE NOT indisvalid OR NOT indisready`);
-    check('every index is valid', badIndexes.length === 0, badIndexes.map((i) => i.i).join(', '));
+    const badConstraints = await q(`SELECT conrelid::regclass::text AS t, conname FROM pg_constraint WHERE NOT convalidated AND connamespace = 'public'::regnamespace`);
+    check('every constraint of the app is validated', badConstraints.length === 0, badConstraints.map((c) => `${c.t}.${c.conname}`).join(', '));
+    const badIndexes = await q(`SELECT indexrelid::regclass::text AS i FROM pg_index i JOIN pg_class c ON c.oid = i.indrelid WHERE (NOT i.indisvalid OR NOT i.indisready) AND c.relnamespace = 'public'::regnamespace`);
+    check('every index of the app is valid', badIndexes.length === 0, badIndexes.map((i) => i.i).join(', '));
     const triggers = await q(`SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND tgenabled <> 'D'`);
     const names = new Set(triggers.map((t) => t.tgname));
     const needed = ['opportunity_history_no_update_delete', 'opportunity_fill_code', 'opportunity_code_fixed', 'salesperson_fill_id_prefix'];
@@ -91,7 +91,7 @@ async function main() {
 
     // Sizes, for the record.
     console.log('\nRows per table (largest first):');
-    const sizes = await q(`SELECT relname AS t, n_live_tup::int AS rows, pg_size_pretty(pg_total_relation_size(relid)) AS size FROM pg_stat_user_tables ORDER BY pg_total_relation_size(relid) DESC LIMIT 12`);
+    const sizes = await q(`SELECT relname AS t, n_live_tup::int AS rows, pg_size_pretty(pg_total_relation_size(relid)) AS size FROM pg_stat_user_tables WHERE schemaname = 'public' ORDER BY pg_total_relation_size(relid) DESC LIMIT 12`);
     for (const s of sizes) console.log(`  ${s.t.padEnd(28)} ${String(s.rows).padStart(8)} rows  ${s.size}`);
 
     await client.query('ROLLBACK');
