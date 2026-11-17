@@ -33,6 +33,7 @@ import Renewals from './pages/renewals/Renewals';
 import Notifications from './pages/Notifications';
 import SyncStatus from './pages/SyncStatus';
 import Approvals from './pages/companies/Approvals';
+import Account from './pages/Account';
 import Products, { ProductDetail } from './pages/products/Products';
 
 export default function App() {
@@ -67,6 +68,7 @@ export default function App() {
         <Route path="renewals" element={<Renewals />} />
         {isManagingRole(user.role) && <Route path="approvals" element={<Approvals />} />}
         <Route path="more" element={<More />} />
+        <Route path="account" element={<Account />} />
         {user.role !== 'salesperson' && <Route path="team" element={<Team />} />}
         {user.role !== 'salesperson' && <Route path="reports" element={<WeeklyReports />} />}
         {isManagingRole(user.role) && <Route path="team/handover" element={<Handover />} />}

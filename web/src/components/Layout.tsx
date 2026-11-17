@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { LogOutIcon, PlusIcon } from 'lucide-react';
+import { KeyRoundIcon, LogOutIcon, PlusIcon } from 'lucide-react';
 import companyLogo from '../assets/brand/technicon-logo.png';
 import { syncOutbox, useOutbox } from '../lib/outbox';
 import { useAuth } from '../lib/auth';
@@ -115,6 +115,9 @@ export default function Layout() {
                   <p className="text-[14px] font-medium text-fg truncate">{user.username}</p>
                   <p className="text-[12px] text-subtle">{roleLabel(user.role)}</p>
                 </div>
+                <DropdownMenuItem className="ts-mi !flex !gap-2" onSelect={() => navigate('/account')}>
+                  <KeyRoundIcon className="size-4" aria-hidden="true" /> Change password
+                </DropdownMenuItem>
                 <DropdownMenuItem className="ts-mi !flex !gap-2 text-bad" onSelect={() => void logout()}>
                   <LogOutIcon className="size-4" aria-hidden="true" /> Sign out
                 </DropdownMenuItem>

@@ -109,6 +109,7 @@ export const api = {
     login: (username: string, password: string) => post<{ user: SessionUser }>('/auth/login', { username, password }),
     setup: (username: string, password: string) => post<{ user: SessionUser }>('/auth/setup', { username, password }),
     logout: () => post<{ ok: true }>('/auth/logout'),
+    changePassword: (current_password: string, new_password: string) => post<{ ok: true }>('/auth/change-password', { current_password, new_password }),
   },
   users: {
     list: () => request<UserAccount[]>('/admin/users'),
