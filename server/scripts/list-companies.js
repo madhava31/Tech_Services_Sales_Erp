@@ -16,10 +16,10 @@ async function main() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error('DATABASE_URL is not set.');
   if (!isLocalDatabaseUrl(url) && !process.argv.includes('--remote')) throw new Error('Refusing: pass --remote to read a remote database.');
+  console.log(`Database: ${new URL(url).host}${new URL(url).pathname}`);
   const client = createClient(url);
   await client.connect();
   try {
-    console.log(`Database: ${new URL(url).host}${new URL(url).pathname}`);
     const { rows } = await client.query(`
       SELECT c.id, c.name, c.city, c.category, c.approval_status, u.username AS created_by, c.created_at::date AS created,
              (SELECT COUNT(*)::int FROM opportunity o WHERE o.company_id = c.id) AS deals,

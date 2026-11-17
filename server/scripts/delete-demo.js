@@ -30,6 +30,7 @@ async function main() {
     throw new Error('Refusing: pass --remote or set ALLOW_REMOTE_DEMO=1 to run against a remote database.');
   }
 
+  console.log(`Database: ${new URL(url).host}${new URL(url).pathname}`);
   const client = createClient(url);
   await client.connect();
   const q = async (sql, params = []) => (await client.query(sql, params)).rows;
