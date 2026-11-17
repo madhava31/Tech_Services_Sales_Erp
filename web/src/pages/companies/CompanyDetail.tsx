@@ -10,7 +10,7 @@ import ContactLogCard from '../../components/ContactLogCard';
 import DealFields, { DealDraft, EMPTY_DEAL_DRAFT, dealDraftComplete, draftToInput } from '../../components/DealFields';
 import OwnerField, { useOwnerChoice } from '../../components/OwnerField';
 import { canWriteCrm, isManagingRole } from '../../lib/roles';
-import { Badge, Button, Card, CardHeader, EmptyState, Notice, OverdueBadge, PhoneField, TextField, LoadingCard } from '../../components/ui';
+import { Badge, Button, Card, CardHeader, EmptyState, Notice, OverdueBadge, PhoneField, TextAreaField, TextField, LoadingCard } from '../../components/ui';
 
 function CompanyChooser({
   title,
@@ -101,6 +101,8 @@ function CompanyPage({ id }: { id: number }) {
   );
   const managing = isManagingRole(user?.role);
   const [panel, setPanel] = useState<'merge' | 'parent' | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteReason, setDeleteReason] = useState('');
   const writer = canWriteCrm(user?.role);
   const [addingContact, setAddingContact] = useState(false);
   const [contact, setContact] = useState({ name: '', designation: '', department: '', phone: '', email: '' });
@@ -263,6 +265,78 @@ function CompanyPage({ id }: { id: number }) {
           </Button>
         </div>
       )}
+      {c.deletion_request ? (
+        <div className="ts-box !bg-warnbg text-warn text-[13.5px]">
+          <b>Deletion requested by {c.deletion_request.requested_by_name}.</b> “{c.deletion_request.reason}” Waiting for a manager’s decision.{' '}
+          {managing && (
+            <Link to="/approvals" className="font-medium underline">
+              Review it
+            </Link>
+          )}
+        </div>
+      ) : writer && (managing || c.created_by === user?.id) ? (
+        deleting ? (
+          <form
+            className="ts-box flex flex-col gap-3"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setBusy(true);
+              setError('');
+              try {
+                const res = await api.companies.requestDeletion(c.id, deleteReason.trim());
+                window.dispatchEvent(new Event('notifications-check'));
+                if (res.archived) {
+                  navigate('/companies', { replace: true });
+                  return;
+                }
+                setDeleting(false);
+                setDeleteReason('');
+                await company.reload();
+              } catch (err) {
+                setError(err instanceof Error ? err.message : 'Could not delete the company.');
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            <TextAreaField
+              label="Why should this company be deleted?"
+              value={deleteReason}
+              onChange={(e) => setDeleteReason(e.target.value)}
+              maxLength={300}
+              required
+              autoFocus
+              hint={
+                managing
+                  ? 'It is hidden at once. Its open opportunities are closed as lost and its open follow-ups cancelled. The history is kept.'
+                  : 'A manager or admin has to approve it. Nothing is deleted until they do.'
+              }
+            />
+            <div className="flex gap-2">
+              <Button type="submit" variant="danger" size="sm" disabled={busy || !deleteReason.trim()}>
+                {managing ? 'Delete company' : 'Send for approval'}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setDeleting(false);
+                  setDeleteReason('');
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <div>
+            <Button size="sm" variant="ghost" onClick={() => setDeleting(true)}>
+              {managing ? 'Delete company…' : 'Ask to delete this company…'}
+            </Button>
+          </div>
+        )
+      ) : null}
       {panel === 'parent' && (
         <CompanyChooser
           title="Whose branch is this?"

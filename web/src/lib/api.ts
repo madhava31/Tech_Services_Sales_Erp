@@ -144,6 +144,11 @@ export const api = {
     approvals: () => request<PendingCompany[]>('/companies/approvals'),
     approve: (id: number) => post<CompanyDetail>(`/companies/${id}/approve`),
     reject: (id: number, reason: string) => post<CompanyDetail>(`/companies/${id}/reject`, { reason }),
+    deletionRequests: () => request<DeletionRequest[]>('/companies/deletion-requests'),
+    // A salesperson's goes to a manager; a manager's or admin's deletes at once (archived: true).
+    requestDeletion: (id: number, reason: string) => post<{ archived?: boolean; id?: number; status?: string }>(`/companies/${id}/delete-request`, { reason }),
+    approveDeletion: (id: number) => post<{ id: number; status: string }>(`/companies/deletion-requests/${id}/approve`),
+    rejectDeletion: (id: number, reason: string) => post<{ id: number; status: string }>(`/companies/deletion-requests/${id}/reject`, { reason }),
     checkDuplicates: (name: string, phone?: string | null, city?: string | null, parentId?: number | null) =>
       request<DuplicateCandidate[]>(`/companies/check-duplicates${qs({ name, phone, city, parent_company_id: parentId })}`),
     get: (id: number) =>
@@ -778,6 +783,18 @@ export interface CompanySummary {
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
 
+// A request to delete a company, waiting for a manager; `impact` is what the company holds.
+export interface DeletionRequest {
+  id: number;
+  company_id: number;
+  company_name: string;
+  company_city: string | null;
+  requested_by_name: string;
+  reason: string;
+  created_at: string;
+  impact: { open_deals: number; closed_deals: number; visits: number; contacts: number; open_tasks: number; branches: number };
+}
+
 export interface PendingCompany extends CompanySummary {
   category: string | null;
   contact_person: string | null;
@@ -915,8 +932,10 @@ export interface CompanyDetail extends CompanySummary {
   contact_log: ContactLogEntry[];
   parent: { id: number; name: string; city: string | null } | null;
   branches: { id: number; name: string; city: string | null; approval_status: ApprovalStatus; open_deals: number; pipeline_value: number }[];
+  created_by?: number;
   created_by_username: string;
   created_at: string;
+  deletion_request?: { id: number; reason: string; created_at: string; requested_by_name: string } | null;
   contacts: Contact[];
   visits: { id: number; visited_at: string; status: 'draft' | 'completed'; outcome: Outcome | null; notes: string | null; salesperson_name: string; contact_name: string | null }[];
   tasks: { id: number; title: string; task_type: TaskType; due_date: string; priority: string; assignee_name: string }[];

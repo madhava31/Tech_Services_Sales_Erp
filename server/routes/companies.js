@@ -255,7 +255,16 @@ router.get('/:id', async (req, res) => {
       )
       .all(...logParams);
 
-    res.json({ ...company, contact_log: contactLog, parent, branches, contacts, visits, tasks, requirements, opportunities });
+    // A request to delete it that is waiting for a manager, if there is one.
+    const deletionRequest =
+      (await db
+        .prepare(
+          `SELECT r.id, r.reason, r.created_at, COALESCE(sp.name, u.username) AS requested_by_name
+           FROM company_deletion_request r JOIN app_user u ON u.id = r.requested_by LEFT JOIN salesperson sp ON sp.id = u.salesperson_id
+           WHERE r.company_id = ? AND r.status = 'pending'`
+        )
+        .get(id)) ?? null;
+    res.json({ ...company, contact_log: contactLog, parent, branches, contacts, visits, tasks, requirements, opportunities, deletion_request: deletionRequest });
   } catch (err) {
     sendError(res, err);
   }
