@@ -1,0 +1,109 @@
+part_number,product_name,make,category,key_features
+TS-PE-AAS,PinAAcle Series AAS (Atomic Absorption Spectrometer),PerkinElmer,Inorganic analysis,Atomic absorption spectrometer
+TS-PE-ICPOES,Avio Series ICP-OES,PerkinElmer,Inorganic analysis,ICP-OES
+TS-PE-ICPMS,ICP-MS,PerkinElmer,Inorganic analysis,ICP-MS
+TS-PE-MPS320,MPS 320 Microwave Digestion System,PerkinElmer,Inorganic analysis,Sample digestion
+TS-PE-GC2400,GC 2400 Platform,PerkinElmer,Chromatography,Gas chromatography
+TS-PE-CLARUS,GC Clarus Platform,PerkinElmer,Chromatography,Gas chromatography
+TS-PE-HS2400,HS 2400 Headspace Sampler,PerkinElmer,Chromatography,Headspace technology
+TS-PE-TURBOMATRIX,TurboMatrix Headspace Sampler,PerkinElmer,Chromatography,Headspace technology
+TS-PE-CUSTOMGC,Customized GC Analyzers,PerkinElmer,Chromatography,Customized GC analyzers
+TS-PE-LC300,LC 300 HPLC/UHPLC Series,PerkinElmer,Chromatography,Liquid chromatography | HPLC | UHPLC
+TS-PE-LAMBDA,Lambda Series UV-Vis & UV-Vis-NIR Spectrometers,PerkinElmer,Molecular spectroscopy,UV-Vis | UV-Vis-NIR
+TS-PE-FTIR,Spectrum Two FT-IR,PerkinElmer,Molecular spectroscopy,FTIR
+TS-PE-FTNIR,Spectrum Two FT-NIR,PerkinElmer,Molecular spectroscopy,FTNIR
+TS-PE-SPOTLIGHT,Spotlight Series IR-Microscopy & Imaging,PerkinElmer,Molecular spectroscopy,IR/NIR microscopy and imaging
+TS-PE-FLUOR,Fluorescence Spectrometers,PerkinElmer,Molecular spectroscopy,Fluorescence spectrometers
+TS-PE-TGA,TGA (Thermogravimetric Analyzer),PerkinElmer,Thermal analysis,TGA
+TS-PE-DMA,DMA (Dynamic Mechanical Analyzer),PerkinElmer,Thermal analysis,DMA
+TS-PE-DSC,DSC (Differential Scanning Calorimeter),PerkinElmer,Thermal analysis,DSC
+TS-PE-STA,STA (DTA),PerkinElmer,Thermal analysis,STA (DTA)
+TS-PE-TGAIRGCMS,TGA-IR-GCMS,PerkinElmer,Hyphenated techniques,TGA-IR-GCMS
+TS-PE-TGAMS,TGA-MS,PerkinElmer,Hyphenated techniques,TGA-MS
+TS-PE-TGAGCMS,TGA-GCMS,PerkinElmer,Hyphenated techniques,TGA-GC/MS
+TS-PE-TGAIR,TGA-IR,PerkinElmer,Hyphenated techniques,TGA-IR
+TS-PE-UVDSCDMA,UV-DSC/DMA,PerkinElmer,Hyphenated techniques,UV-DSC/DMA
+TS-PE-GCMS2400,GC 2400 with MS 2400 SQ Detector System,PerkinElmer,Mass spectrometry,GCMS
+TS-PE-CLARUSSQ8,Clarus SQ 8 GCMS,PerkinElmer,Mass spectrometry,GCMS
+TS-PE-QSIGHT,QSight LC-MS/MS,PerkinElmer,Mass spectrometry,LC/MS/MS
+TS-PE-PORTGCMS,Portable GCMS,PerkinElmer,Mass spectrometry,Portable GCMS
+TS-PE-CON-VIALS,Auto Sampler Vials,PerkinElmer,Consumables,Sample handling consumables
+TS-PE-CON-CAPS,Vial Caps & Septa,PerkinElmer,Consumables,Sample handling consumables
+TS-PE-CON-GASFILTER,Gas Filters,PerkinElmer,Consumables,GC consumables
+TS-PE-CON-GCCOL,GC Columns,PerkinElmer,Consumables,GC consumables
+TS-PE-CON-GCVIALCAPS,GC Vial Caps,PerkinElmer,Consumables,GC consumables
+TS-PE-CON-GCFERRULE,GC Ferrules,PerkinElmer,Consumables,GC consumables
+TS-PE-CON-GASGEN,Gas Generators,PerkinElmer,Consumables,Gas supply consumables
+TS-MT-PH,pH Meter,Mettler Toledo,pH measurement,
+TS-MT-PHCOND,pH Meter & Conductivity,Mettler Toledo,pH measurement,
+TS-MT-TITRATOR,Auto Titrator,Mettler Toledo,Automated titration,
+TS-MT-DENSITY,Density Meter,Mettler Toledo,Density measurement,
+TS-MT-REFRACTO,Refractometer,Mettler Toledo,Density measurement,
+TS-MT-UVVIS,Spectrophotometer (UV/Vis),Mettler Toledo,UV/Vis analysis,
+TS-MT-MELTPT,Melting Point,Mettler Toledo,UV/Vis analysis,
+TS-MT-ABAL,Analytical Balance,Mettler Toledo,Balances,
+TS-MT-MICROBAL,Microbalance,Mettler Toledo,Balances,
+TS-MT-SEMIMICRO,Semi-Microbalance,Mettler Toledo,Balances,
+TS-MT-MOISTURE,Moisture Balance,Mettler Toledo,Balances,
+TS-AP-PSA,Particle Size Analyzer,Anton Paar,Particle & surface analysis,
+TS-AP-ZETA,Surface Charge & Zeta Potential,Anton Paar,Particle & surface analysis,
+TS-AP-REFRACTO,Refractometer,Anton Paar,Particle & surface analysis,
+TS-AP-RHEO,Rheometers,Anton Paar,Rheology & physical properties,
+TS-AP-DENSITY,Density Meter,Anton Paar,Rheology & physical properties,
+TS-AP-POLARI,Polarimeter,Anton Paar,Rheology & physical properties,
+TS-AP-FLASH,Flash Point,Anton Paar,Liquid properties analysis,
+TS-AP-VISCO,Viscometer,Anton Paar,Liquid properties analysis,
+TS-AP-RAMAN,Raman Spectrometer,Anton Paar,Advanced materials characterization,
+TS-AP-UNIVTEST,Universal Testing,Anton Paar,Advanced materials characterization,
+TS-AP-XRD,XRDynamic 500 (X-ray Diffraction),Anton Paar,Structural analysis,X-ray diffraction (XRD)
+TS-SH-CIC,Combustion Ion Chromatography System,SHINE,Ion combustion,New
+TS-ME-WATER,Water Purification System,Merck,Water purification,New
+TS-TC-VIAL-AMBER,2ml Amber Vials and Caps,Technicon Services,Vials & containers,
+TS-TC-VIAL-SCREW,2ml Screw Vial and Cap,Technicon Services,Vials & containers,
+TS-TC-VIAL-CAPS,2ml Vials & Caps,Technicon Services,Vials & containers,
+TS-TC-VIAL-STORAGE,Storage Vials,Technicon Services,Vials & containers,
+TS-TC-FLEXCAP,Flexible Capillary,Technicon Services,Vials & containers,
+TS-TC-FRONTOVEN,Front Oven Kit,Technicon Services,Vials & containers,
+TS-TC-COL-BIOSEC,BioCore SEC Columns,Technicon Services,Columns,
+TS-TC-COL-BIOWCX,BioCore WCX / SCX / SAX,Technicon Services,Columns,
+TS-TC-COL-CHROMEHILIC,Chromecore Normal Phase-HILIC Columns,Technicon Services,Columns,
+TS-TC-COL-BIOHPLC,BioCore HPLC Columns,Technicon Services,Columns,
+TS-TC-COL-HPLC,HPLC Columns,Technicon Services,Columns,
+TS-TC-COL-CHIRAL,Chiral Columns,Technicon Services,Columns,
+TS-TC-GCFERRULE,GC Ferrules,Technicon Services,Ferrules & seals,
+TS-TC-GLOVES,Gloves,Technicon Services,Ferrules & seals,
+TS-TC-GRAPHITE,Graphite Ferrule,Technicon Services,Ferrules & seals,
+TS-TC-GUARDCOL,Guard Column,Technicon Services,Ferrules & seals,
+TS-TC-PISTONSEAL,Black Piston Seals,Technicon Services,Ferrules & seals,
+TS-TC-BOTTLECAP3,Bottle Cap (3 Holes),Technicon Services,Ferrules & seals,
+TS-TC-CHECKVALVE,Check Valve,Technicon Services,Fittings,
+TS-TC-COLNUTS,Column Nuts (Agilent / Chemito / Varian / Perkin Elmer),Technicon Services,Fittings,
+TS-TC-COLCLAMP,Column Clamp,Technicon Services,Fittings,
+TS-TC-FERRULE,Ferrule,Technicon Services,Fittings,
+TS-TC-FERRULE05,Ferrule 0.5mm,Technicon Services,Fittings,
+TS-TC-INJSEPTA,Injector Port Septa,Technicon Services,Fittings,
+TS-TC-LOOP100,Capillary 100uL Loop,Technicon Services,Tubing & tools,
+TS-TC-CONNTUBE,Connecting Tubing with Fittings,Technicon Services,Tubing & tools,
+TS-TC-IGNCABLE,Igniter Cable Assembly,Technicon Services,Tubing & tools,
+TS-TC-IGNGLOW,Igniter Glow Plug Assembly,Technicon Services,Tubing & tools,
+TS-TC-SPATULA,Disposable Spatulas (Blue & Green),Technicon Services,Tubing & tools,
+TS-TC-CAPPER,Ergonomic Manual Capper,Technicon Services,Tubing & tools,
+TS-TC-FILTVIAL,Filter Vial Nylon 0.22um Red Snap Cap,Technicon Services,Filters & consumables,
+TS-TC-NEEDLE,Needle Assembly,Technicon Services,Filters & consumables,
+TS-TC-SYRINGEFILTER,Nylon & PTFE Syringe Filters,Technicon Services,Filters & consumables,
+TS-TC-MICROBOAT,Micro Weighing Boats,Technicon Services,Filters & consumables,
+TS-TC-BOAT,Weighing Boats,Technicon Services,Filters & consumables,
+TS-TC-SAFETYCAP,Mobile Phase Solvents Safety Caps,Technicon Services,Filters & consumables,
+TS-TC-REGULATOR,Gas Regulators,Technicon Services,Gas & injection,
+TS-TC-SAMPBOMB,Gas Sampling Bomb,Technicon Services,Gas & injection,
+TS-TC-SAPPHIRE,Sapphire Plunger,Technicon Services,Gas & injection,
+TS-TC-PLUNGERSEAL,Plunger Seals,Technicon Services,Gas & injection,
+TS-TC-PLUNGERHOUSE,Plunger Housing,Technicon Services,Gas & injection,
+TS-TC-PEEKFIT,Peek Fittings,Technicon Services,Gas & injection,
+TS-TC-PEEKUNION,Peek Union & Silicone Tubing (PF 2 / PF 6 / PF S1),Technicon Services,Gas & injection,
+TS-TC-LABEQ1,Laboratory Equipment,Technicon Services,Laboratory equipment,
+TS-TC-LABEQ2,Laboratory Equipment 2,Technicon Services,Laboratory equipment,
+TS-TC-WASTE10,Waste Collection Tank 10Lts,Technicon Services,Laboratory equipment,
+TS-TC-WASTE20,Waste Collection Tank 20Lts,Technicon Services,Laboratory equipment,
+TS-TC-WASTEFILTER,Waste Liquid Filter,Technicon Services,Laboratory equipment,
+TS-TC-TURRET,Transfer Turret,Technicon Services,Laboratory equipment,
