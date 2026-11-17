@@ -28,6 +28,8 @@ export default function Opportunities() {
   const [rows, setRows] = useState<Opportunity[] | null>(null);
   const [error, setError] = useState('');
   const [q, setQ] = useState('');
+  const [notice, setNotice] = useState('');
+  const [deleting, setDeleting] = useState<number | null>(null);
 
   useEffect(() => {
     setRows(null);
@@ -43,11 +45,17 @@ export default function Opportunities() {
     canWriteCrm(user?.role) && d.stage !== 'won' && (isManagingRole(user?.role) || (user?.salesperson_id != null && user.salesperson_id === d.owner_salesperson_id));
   async function deleteDeal(d: Opportunity) {
     if (!(await askConfirm(`Delete "${d.title}" (${d.code})? Its history, quotations and follow-ups are removed. This can’t be undone.`, 'Delete opportunity'))) return;
+    setError('');
+    setNotice('');
+    setDeleting(d.id);
     try {
       await api.opportunities.remove(d.id);
       setRows((current) => current?.filter((r) => r.id !== d.id) ?? null);
+      setNotice(`Deleted ${d.code}: “${d.title}”.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not delete the opportunity.');
+    } finally {
+      setDeleting(null);
     }
   }
 
@@ -74,7 +82,8 @@ export default function Opportunities() {
           )
         }
       />
-      {error && <Notice tone="error">{error}</Notice>}
+      {error && <Notice tone="error" onDismiss={() => setError('')}>{error}</Notice>}
+      {notice && <Notice tone="success" onDismiss={() => setNotice('')}>{notice}</Notice>}
       <section className="ts-card ts-white ts-tcard ts-tbl !mt-0">
         <div className="ts-tbar">
           <div className="ts-tabs" role="tablist">
@@ -133,8 +142,8 @@ export default function Opportunities() {
                       {teamView && <td className="ts-muted">{d.owner_name}</td>}
                       <td className="ts-r">
                         {canDelete(d) && (
-                          <button type="button" className="ts-lnk text-danger" onClick={() => void deleteDeal(d)}>
-                            Delete
+                          <button type="button" className="ts-lnk text-danger disabled:opacity-60" disabled={deleting !== null} onClick={() => void deleteDeal(d)}>
+                            {deleting === d.id ? 'Deleting…' : 'Delete'}
                           </button>
                         )}
                       </td>

@@ -596,8 +596,13 @@ router.delete('/:id', requireCrmWriter, async (req, res) => {
     const reason = optionalText(req.body ?? {}, 'reason', { max: 300 });
     const id = opp.id;
     await db.transaction(async () => {
-      const history = await db.prepare(`SELECT * FROM opportunity_history WHERE opportunity_id = ? ORDER BY id`).all(id);
-      const quotations = await db.prepare(`SELECT * FROM quotation_link WHERE opportunity_id = ?`).all(id);
+      const copy = await db
+        .prepare(
+          `SELECT (SELECT COALESCE(json_agg(h ORDER BY h.id), '[]'::json) FROM opportunity_history h WHERE h.opportunity_id = ?) AS history,
+                  (SELECT COALESCE(json_agg(q), '[]'::json) FROM quotation_link q WHERE q.opportunity_id = ?) AS quotations`
+        )
+        .get(id, id);
+      const { history, quotations } = copy;
       await recordAudit({
         actorUserId: req.user.id,
         action: 'opportunity.deleted',
@@ -607,19 +612,31 @@ router.delete('/:id', requireCrmWriter, async (req, res) => {
         before: { opportunity: opp, history, quotations },
         after: null,
       });
-      await db.prepare(`DELETE FROM auto_followup WHERE task_id IN (SELECT id FROM task WHERE opportunity_id = ?)`).run(id);
-      await db.prepare(`DELETE FROM task WHERE opportunity_id = ?`).run(id);
-      for (const table of ['tender', 'quotation_link', 'opportunity_product', 'opportunity_custom_product', 'opportunity_oem', 'opportunity_segment']) {
-        await db.prepare(`DELETE FROM ${table} WHERE opportunity_id = ?`).run(id);
-      }
-      for (const table of ['visit', 'requirement', 'contact_log', 'installed_instrument']) {
-        await db.prepare(`UPDATE ${table} SET opportunity_id = NULL WHERE opportunity_id = ?`).run(id);
-      }
+      // One round trip for all of it: over a distant database each statement costs a network hop, and
+      // sixteen of them made this take many seconds. `id` is a validated integer, so it is safe to inline.
       // History is append-only; the trigger is paused for this one delete, inside the transaction.
-      await db.prepare(`ALTER TABLE opportunity_history DISABLE TRIGGER opportunity_history_no_update_delete`).run();
-      await db.prepare(`DELETE FROM opportunity_history WHERE opportunity_id = ?`).run(id);
-      await db.prepare(`ALTER TABLE opportunity_history ENABLE TRIGGER opportunity_history_no_update_delete`).run();
-      await db.prepare(`DELETE FROM opportunity WHERE id = ?`).run(id);
+      const n = Number(id);
+      if (!Number.isInteger(n)) throw new HttpError(400, 'Invalid opportunity id');
+      await db
+        .prepare(
+          `DELETE FROM auto_followup WHERE task_id IN (SELECT id FROM task WHERE opportunity_id = ${n});
+           DELETE FROM task WHERE opportunity_id = ${n};
+           DELETE FROM tender WHERE opportunity_id = ${n};
+           DELETE FROM quotation_link WHERE opportunity_id = ${n};
+           DELETE FROM opportunity_product WHERE opportunity_id = ${n};
+           DELETE FROM opportunity_custom_product WHERE opportunity_id = ${n};
+           DELETE FROM opportunity_oem WHERE opportunity_id = ${n};
+           DELETE FROM opportunity_segment WHERE opportunity_id = ${n};
+           UPDATE visit SET opportunity_id = NULL WHERE opportunity_id = ${n};
+           UPDATE requirement SET opportunity_id = NULL WHERE opportunity_id = ${n};
+           UPDATE contact_log SET opportunity_id = NULL WHERE opportunity_id = ${n};
+           UPDATE installed_instrument SET opportunity_id = NULL WHERE opportunity_id = ${n};
+           ALTER TABLE opportunity_history DISABLE TRIGGER opportunity_history_no_update_delete;
+           DELETE FROM opportunity_history WHERE opportunity_id = ${n};
+           ALTER TABLE opportunity_history ENABLE TRIGGER opportunity_history_no_update_delete;
+           DELETE FROM opportunity WHERE id = ${n}`
+        )
+        .all(); // several statements in one call come back as a list, so run() would trip on it
     });
     res.json({ deleted: true });
   } catch (err) {
