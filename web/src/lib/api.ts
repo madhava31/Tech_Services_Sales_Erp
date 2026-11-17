@@ -266,6 +266,8 @@ export const api = {
       id: number,
       data: { stage: Stage; note?: string; won_value?: number; lost_reason?: LostReason; close_reason?: string }
     ) => post<Opportunity>(`/opportunities/${id}/stage`, data),
+    // The owner or a manager deletes at once; a won opportunity can't be deleted.
+    remove: (id: number, reason?: string) => request<{ deleted: boolean }>(`/opportunities/${id}`, { method: 'DELETE', body: JSON.stringify({ reason }) }),
     addQuotation: (id: number, data: QuotationInput) => post<QuotationLink>(`/opportunities/${id}/quotations`, data),
     updateQuotation: (linkId: number, data: Partial<QuotationInput>) => put<QuotationLink>(`/quotation-links/${linkId}`, data),
   },

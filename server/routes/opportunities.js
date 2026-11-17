@@ -583,6 +583,50 @@ router.post('/:id/owner', requireCrmWriter, async (req, res) => {
   }
 });
 
+// Delete an opportunity: its owner or a manager/admin, no second approval. A won deal is revenue on the
+// books, so it stays. The row is removed, with its history, links and follow-ups; the audit log keeps a
+// full copy so it can be rebuilt by hand.
+router.delete('/:id', requireCrmWriter, async (req, res) => {
+  try {
+    const opp = await loadVisibleOpportunity(req.user, Number(req.params.id));
+    if (!isManaging(req.user) && opp.owner_salesperson_id !== req.user.salesperson_id) {
+      throw new HttpError(403, 'Only the salesperson who owns this opportunity, or a manager, can delete it.');
+    }
+    if (opp.stage === 'won') throw new HttpError(409, 'A won opportunity can’t be deleted. It counts as revenue.');
+    const reason = optionalText(req.body ?? {}, 'reason', { max: 300 });
+    const id = opp.id;
+    await db.transaction(async () => {
+      const history = await db.prepare(`SELECT * FROM opportunity_history WHERE opportunity_id = ? ORDER BY id`).all(id);
+      const quotations = await db.prepare(`SELECT * FROM quotation_link WHERE opportunity_id = ?`).all(id);
+      await recordAudit({
+        actorUserId: req.user.id,
+        action: 'opportunity.deleted',
+        entityType: 'opportunity',
+        entityId: id,
+        summary: `Deleted "${opp.title}" (${opp.code}, ${opp.company_name}) at ${opp.stage}${reason ? `: ${reason}` : ''}`,
+        before: { opportunity: opp, history, quotations },
+        after: null,
+      });
+      await db.prepare(`DELETE FROM auto_followup WHERE task_id IN (SELECT id FROM task WHERE opportunity_id = ?)`).run(id);
+      await db.prepare(`DELETE FROM task WHERE opportunity_id = ?`).run(id);
+      for (const table of ['tender', 'quotation_link', 'opportunity_product', 'opportunity_custom_product', 'opportunity_oem', 'opportunity_segment']) {
+        await db.prepare(`DELETE FROM ${table} WHERE opportunity_id = ?`).run(id);
+      }
+      for (const table of ['visit', 'requirement', 'contact_log', 'installed_instrument']) {
+        await db.prepare(`UPDATE ${table} SET opportunity_id = NULL WHERE opportunity_id = ?`).run(id);
+      }
+      // History is append-only; the trigger is paused for this one delete, inside the transaction.
+      await db.prepare(`ALTER TABLE opportunity_history DISABLE TRIGGER opportunity_history_no_update_delete`).run();
+      await db.prepare(`DELETE FROM opportunity_history WHERE opportunity_id = ?`).run(id);
+      await db.prepare(`ALTER TABLE opportunity_history ENABLE TRIGGER opportunity_history_no_update_delete`).run();
+      await db.prepare(`DELETE FROM opportunity WHERE id = ?`).run(id);
+    });
+    res.json({ deleted: true });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
 // Quotations in the ERP for this deal's customer that aren't on a deal yet, to pick from instead of
 // retyping. Empty until the company is linked to its ERP customer.
 router.get('/:id/erp-quotations', async (req, res) => {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, DealInput, ErpQuotation, LostReason, OpportunityDetail, QuotationStatus, Stage } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { askConfirm } from '../../lib/confirm';
@@ -31,6 +31,7 @@ type Panel = 'won' | 'lost' | 'reopen' | 'edit' | 'transfer' | null;
 export default function DealDetail() {
   const id = Number(useParams().id);
   const { user } = useAuth();
+  const navigate = useNavigate();
   const deal = useLoad<OpportunityDetail | null>(() => api.opportunities.get(id), null);
   const [panel, setPanel] = useState<Panel>(null);
   const [error, setError] = useState('');
@@ -59,6 +60,21 @@ export default function DealDetail() {
 
   const open = !d.closed_at;
   const writer = canWriteCrm(user?.role);
+  // The owner or a manager can delete it; a won opportunity is revenue and stays.
+  const canDelete = writer && d.stage !== 'won' && (isManagingRole(user?.role) || (user?.salesperson_id != null && user.salesperson_id === d.owner_salesperson_id));
+  async function deleteDeal() {
+    if (!d) return;
+    if (!(await askConfirm(`Delete "${d.title}" (${d.code})? Its history, quotations and follow-ups are removed. This can’t be undone.`, 'Delete opportunity'))) return;
+    setBusy(true);
+    setError('');
+    try {
+      await api.opportunities.remove(d.id);
+      navigate('/opportunities', { replace: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not delete the opportunity.');
+      setBusy(false);
+    }
+  }
   const stageIndex = OPEN_STAGES.indexOf(d.stage);
   // The step after the current one on the stepper. Negotiation's next step is Mark won or Mark lost.
   const nextStage = stageIndex >= 0 && stageIndex < OPEN_STAGES.length - 1 ? OPEN_STAGES[stageIndex + 1] : null;
@@ -220,6 +236,14 @@ export default function DealDetail() {
               </Button>
             )
           )}
+        </div>
+      )}
+
+      {canDelete && (
+        <div>
+          <Button size="sm" variant="ghost" disabled={busy} onClick={() => void deleteDeal()}>
+            Delete opportunity
+          </Button>
         </div>
       )}
 
