@@ -39,6 +39,10 @@ before(async () => {
     });
     assert.equal(res.status, 201, JSON.stringify(res.body));
   }
+  for (const [companyId, kind] of [[typedIn, 'reorder'], [keep, 'amc']]) {
+    const [task] = await query(`INSERT INTO task (company_id, assignee_salesperson_id, task_type, title, due_date, created_by) VALUES ($1, $2, 'call', 'Follow up', CURRENT_DATE, $3) RETURNING id`, [companyId, rep.salespersonId, rep.userId]);
+    await query(`INSERT INTO auto_followup (kind, ref_id, target_date, task_id) VALUES ($1, 9000 + $2::int, CURRENT_DATE, $3)`, [kind, companyId, task.id]);
+  }
   await query(`INSERT INTO notification (user_id, kind, for_date, title, body, url, ref_type, ref_id) VALUES ($1, 'approval_request', CURRENT_DATE, 't', 'b', '/', 'company', $2)`, [rep.userId, typedIn]);
 });
 
@@ -75,4 +79,6 @@ test('the confirmed delete removes the tagged and the chosen companies with thei
   assert.equal(await count('opportunity', 'company_id = $1', [keep]), 1);
   assert.equal(await count('opportunity_oem'), 2);
   assert.equal(await count('opportunity_custom_product'), 1);
+  assert.equal(await count('task'), 1, 'the deleted company’s follow-up task is gone, the other stays');
+  assert.equal(await count('auto_followup'), 1);
 });

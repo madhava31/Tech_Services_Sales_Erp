@@ -46,7 +46,7 @@ async function main() {
     console.log(`${selected.length} companies selected:`);
     for (const c of selected) console.log(`  #${c.id}  ${c.name}${c.city ? ` (${c.city})` : ''}${c.category ? `  [${c.category}]` : ''}`);
     if (!dryRun && !confirmed) throw new Error('Refusing: add --dry-run to preview, or --confirm=DELETE to delete for real.');
-    const seeded = selected.some((c) => /(Demo)$/.test(c.category ?? ''));
+    const seeded = selected.some((c) => /\(Demo\)$/.test(c.category ?? ''));
 
     await client.query('BEGIN');
     await q(`CREATE TEMP TABLE doomed_company ON COMMIT DROP AS SELECT id FROM company WHERE category LIKE '%(Demo)' OR id = ANY($1::int[])`, [ids]);
@@ -102,6 +102,15 @@ async function main() {
     await q(`ALTER TABLE opportunity_history ENABLE TRIGGER opportunity_history_no_update_delete`);
 
     // 5. Tasks & requirements
+    // Automatic follow-ups point at their task, and at the instrument or reorder plan they came from.
+    await q(
+      `DELETE FROM auto_followup
+       WHERE task_id IN (SELECT id FROM task WHERE company_id IN (SELECT id FROM doomed_company)
+                            OR opportunity_id IN (SELECT id FROM opportunity WHERE company_id IN (SELECT id FROM doomed_company)))
+          OR (kind IN ('warranty', 'amc') AND ref_id = ANY($1::int[]))
+          OR (kind = 'reorder' AND ref_id = ANY($2::int[]))`,
+      [delInst.map((r) => r.id), delReorder.map((r) => r.id)]
+    );
     const delTasks = await q(`
       DELETE FROM task WHERE company_id IN (SELECT id FROM doomed_company)
          OR opportunity_id IN (SELECT id FROM opportunity WHERE company_id IN (SELECT id FROM doomed_company))
