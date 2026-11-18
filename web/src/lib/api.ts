@@ -54,6 +54,8 @@ export interface SessionUser {
   username: string;
   role: Role;
   salesperson_id: number | null;
+  // After an admin created or reset the login: the temporary password must be replaced first.
+  must_change_password?: boolean;
 }
 
 export interface UserAccount {
@@ -110,6 +112,12 @@ export const api = {
     setup: (username: string, password: string) => post<{ user: SessionUser }>('/auth/setup', { username, password }),
     logout: () => post<{ ok: true }>('/auth/logout'),
     changePassword: (current_password: string, new_password: string) => post<{ ok: true }>('/auth/change-password', { current_password, new_password }),
+    // Setting your own password with a code sent to your registered mobile.
+    otpInfo: () => request<{ phone: string | null; can_send: boolean }>('/auth/otp-info'),
+    firstLoginSend: () => post<{ sent: true }>('/auth/first-login/send'),
+    firstLoginComplete: (data: { new_password: string; otp?: string; current_password?: string }) => post<{ ok: true }>('/auth/first-login/complete', data),
+    forgotSend: (username: string) => post<{ sent: true }>('/auth/forgot/send', { username }),
+    forgotReset: (username: string, otp: string, new_password: string) => post<{ ok: true }>('/auth/forgot/reset', { username, otp, new_password }),
   },
   users: {
     list: () => request<UserAccount[]>('/admin/users'),

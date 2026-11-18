@@ -17,7 +17,7 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 const { createClient, isLocalDatabaseUrl } = await import('../db/migrate.js');
 
 // Tables that only hold a login's own sessions and reminders: safe to clear along with it.
-const OWN_TABLES = new Set(['session', 'notification', 'push_subscription', 'request_idempotency']);
+const OWN_TABLES = new Set(['session', 'notification', 'push_subscription', 'request_idempotency', 'otp_challenge']);
 
 async function main() {
   const url = process.env.DATABASE_URL;

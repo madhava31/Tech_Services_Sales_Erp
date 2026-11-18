@@ -112,10 +112,10 @@ router.post('/', async (req, res) => {
       }
       const info = await db
         .prepare(
-          `INSERT INTO app_user (username, password_hash, password_salt, role, salesperson_id, manager_user_id)
-           VALUES (?, ?, ?, ?, ?, ?) RETURNING id`
+          `INSERT INTO app_user (username, password_hash, password_salt, role, salesperson_id, manager_user_id, must_change_password)
+           VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`
         )
-        .run(username.trim(), hash, salt, role, salespersonId, managerUserId);
+        .run(username.trim(), hash, salt, role, salespersonId, managerUserId, role === 'salesperson');
       const user = await loadUser(info.lastInsertRowid);
       await recordAudit({
         actorUserId: req.user.id,
@@ -264,7 +264,8 @@ router.post('/:id/reset-password', async (req, res) => {
 
     const { salt, hash } = hashPassword(password);
     await db.transaction(async () => {
-      await db.prepare(`UPDATE app_user SET password_hash = ?, password_salt = ? WHERE id = ?`).run(hash, salt, target.id);
+      // A salesperson given a temporary password must replace it on their next sign-in.
+      await db.prepare(`UPDATE app_user SET password_hash = ?, password_salt = ?, must_change_password = (role = 'salesperson') WHERE id = ?`).run(hash, salt, target.id);
       await db.prepare(`DELETE FROM session WHERE user_id = ?`).run(target.id);
       await recordAudit({
         actorUserId: req.user.id,

@@ -5,7 +5,7 @@ export async function getSessionUser(token) {
   if (!token) return null;
   const row = await db
     .prepare(
-      `SELECT u.id, u.username, u.role, u.is_active, u.salesperson_id, s.expires_at
+      `SELECT u.id, u.username, u.role, u.is_active, u.salesperson_id, u.must_change_password, s.expires_at
        FROM session s JOIN app_user u ON u.id = s.user_id
        WHERE s.token = ?`
     )
@@ -24,6 +24,8 @@ export function toSessionUser(row) {
     username: row.username,
     role: row.role,
     salesperson_id: row.salesperson_id ?? null,
+    // After an admin created or reset the login: the temporary password has to be replaced first.
+    must_change_password: Boolean(row.must_change_password),
   };
 }
 
@@ -31,6 +33,8 @@ export async function requireAuth(req, res, next) {
   try {
     const user = await getSessionUser(req.cookies?.session);
     if (!user) return res.status(401).json({ error: 'Not authenticated' });
+    // Until the temporary password is replaced, nothing else opens (the set-password routes don't use this).
+    if (user.must_change_password) return res.status(403).json({ error: 'Set your own password first.', code: 'password_change_required' });
     req.user = user;
     next();
   } catch (err) {

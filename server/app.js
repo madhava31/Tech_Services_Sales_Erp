@@ -9,6 +9,7 @@ import db from './db/index.js';
 import { requireAuth, requireAdmin } from './auth/middleware.js';
 import cronRouter from './routes/cron.js';
 import authRouter from './routes/auth.js';
+import passwordOtpRouter from './routes/passwordOtp.js';
 import usersRouter from './routes/users.js';
 import salespeopleRouter from './routes/salespeople.js';
 import auditRouter from './routes/audit.js';
@@ -103,6 +104,7 @@ app.get('/api/health', async (req, res) => {
 app.use('/api/cron', cronRouter);
 
 app.use('/api/auth', authRouter);
+app.use('/api/auth', passwordOtpRouter);
 
 // Everything below requires a signed-in, active user. Each router then checks the role.
 app.use('/api', requireAuth);

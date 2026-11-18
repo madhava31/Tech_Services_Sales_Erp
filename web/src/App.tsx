@@ -34,6 +34,7 @@ import Notifications from './pages/Notifications';
 import SyncStatus from './pages/SyncStatus';
 import Approvals from './pages/companies/Approvals';
 import Account from './pages/Account';
+import { SetPassword } from './pages/PasswordFlows';
 import Products, { ProductDetail } from './pages/products/Products';
 
 export default function App() {
@@ -42,6 +43,7 @@ export default function App() {
   if (loading) return <p className="p-6 text-sm text-ink-faint">Loading…</p>;
   if (needsSetup) return <SignIn mode="setup" />;
   if (!user) return <SignIn mode="login" />;
+  if (user.must_change_password) return <SetPassword />;
 
   return (
     <Routes>

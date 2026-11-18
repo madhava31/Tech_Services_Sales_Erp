@@ -123,6 +123,7 @@ router.post('/change-password', async (req, res) => {
     const token = req.cookies?.session;
     const sessionUser = await getSessionUser(token);
     if (!sessionUser) return res.status(401).json({ error: 'Not authenticated' });
+    if (sessionUser.must_change_password) return res.status(403).json({ error: 'Set your own password first, on the screen that opened after you signed in.' });
     const { current_password: current, new_password: next } = req.body ?? {};
     if (!current || !next) return res.status(400).json({ error: 'Enter your current password and a new one.' });
     if (!isAcceptablePassword(next)) return res.status(400).json({ error: PASSWORD_RULE });

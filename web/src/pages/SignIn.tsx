@@ -2,6 +2,7 @@ import { useState } from 'react';
 import companyLogo from '../assets/brand/technicon-logo.png';
 import { useAuth } from '../lib/auth';
 import { Button, Notice, PasswordField, TextField } from '../components/ui';
+import { ForgotPassword } from './PasswordFlows';
 
 function Brand() {
   return (
@@ -18,6 +19,7 @@ export default function SignIn({ mode }: { mode: 'login' | 'setup' }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [forgot, setForgot] = useState(false);
   const isSetup = mode === 'setup';
 
   async function submit(e: React.FormEvent) {
@@ -33,6 +35,8 @@ export default function SignIn({ mode }: { mode: 'login' | 'setup' }) {
       setBusy(false);
     }
   }
+
+  if (forgot && !isSetup) return <ForgotPassword onBack={() => setForgot(false)} />;
 
   return (
     <div className="ts-auth min-h-screen grid grid-cols-1 tablet-lg:grid-cols-[1.05fr_1fr] gap-3 p-3 text-fg antialiased">
@@ -107,6 +111,11 @@ export default function SignIn({ mode }: { mode: 'login' | 'setup' }) {
             <Button type="submit" disabled={busy || !username.trim() || !password} className="w-full !py-3">
               {busy ? 'Please wait…' : isSetup ? 'Create administrator' : 'Sign in'}
             </Button>
+            {!isSetup && (
+              <button type="button" className="ts-lnk text-sm text-left" onClick={() => setForgot(true)}>
+                Forgot your password?
+              </button>
+            )}
           </form>
         </div>
       </main>
