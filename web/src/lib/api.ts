@@ -119,6 +119,13 @@ export const api = {
     forgotSend: (username: string) => post<{ sent: true }>('/auth/forgot/send', { username }),
     forgotReset: (username: string, otp: string, new_password: string) => post<{ ok: true }>('/auth/forgot/reset', { username, otp, new_password }),
   },
+  serviceReports: {
+    list: (params: { status?: 'draft' | 'completed'; q?: string; company_id?: number; instrument_id?: number } = {}) => request<ServiceReportSummary[]>(`/service-reports${qs({ ...params })}`),
+    get: (id: number) => request<ServiceReport>(`/service-reports/${id}`),
+    create: (data: ServiceReportInput) => post<ServiceReport>('/service-reports', data),
+    update: (id: number, data: Partial<ServiceReportInput>) => put<ServiceReport>(`/service-reports/${id}`, data),
+    reopen: (id: number, reason: string) => post<ServiceReport>(`/service-reports/${id}/reopen`, { reason }),
+  },
   users: {
     list: () => request<UserAccount[]>('/admin/users'),
     create: (data: { username: string; password: string } & UserAssignment) => post<UserAccount>('/admin/users', data),
@@ -519,6 +526,79 @@ export interface Instrument extends InstrumentInput {
   salesperson_id: number;
   salesperson_name: string;
   is_active: boolean;
+}
+
+// A field service report: what the engineer found and did at a customer's site, signed by both.
+export interface ServiceReportPart {
+  id?: number;
+  product_id?: number | null;
+  part_no: string | null;
+  description: string;
+  qty: number;
+}
+
+export interface ServiceReportSummary {
+  id: number;
+  code: string;
+  status: 'draft' | 'completed';
+  company_id: number;
+  company_name: string;
+  instrument_name: string;
+  instrument_make: string | null;
+  serial_no: string | null;
+  user_name: string | null;
+  call_attended_date: string;
+  call_completed_date: string | null;
+  engineer_name: string;
+  salesperson_id: number;
+  salesperson_name: string;
+  part_count: number;
+}
+
+export interface ServiceReportInput {
+  company_id: number;
+  contact_id?: number | null;
+  instrument_id?: number | null;
+  company_name: string;
+  company_address?: string | null;
+  user_name?: string | null;
+  user_designation?: string | null;
+  user_department?: string | null;
+  user_phone?: string | null;
+  user_email?: string | null;
+  instrument_make?: string | null;
+  instrument_name: string;
+  model_no?: string | null;
+  serial_no?: string | null;
+  lab?: string | null;
+  call_reported_date: string;
+  call_attended_date: string;
+  call_completed_date?: string | null;
+  problem_reported: string;
+  work_done?: string | null;
+  user_comments?: string | null;
+  engineer_name: string;
+  engineer_signature?: string | null;
+  customer_name?: string | null;
+  customer_signature?: string | null;
+  parts: ServiceReportPart[];
+  complete?: boolean;
+  client_uuid?: string;
+  salesperson_id?: number | null;
+}
+
+export interface ServiceReport extends Omit<ServiceReportInput, 'complete' | 'client_uuid'> {
+  id: number;
+  code: string;
+  status: 'draft' | 'completed';
+  salesperson_id: number;
+  salesperson_name: string;
+  engineer_signed_at: string | null;
+  customer_signed_at: string | null;
+  completed_at: string | null;
+  opportunity_id: number | null;
+  opportunity_code: string | null;
+  created_at: string;
 }
 
 export interface Renewal {

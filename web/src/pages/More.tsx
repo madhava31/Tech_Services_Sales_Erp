@@ -63,6 +63,7 @@ export default function More() {
   const { user } = useAuth();
   const links = [
     { to: '/notifications', title: 'Reminders', text: 'Your daily reminders, and turning them on for this phone.' },
+    { to: '/service-reports', title: 'Service reports', text: 'Field service reports: the call, the instrument, parts and signatures.' },
     { to: '/companies', title: 'Companies', text: 'Search the shared company list and contacts.' },
     { to: '/tenders', title: 'Tenders', text: 'Bid deadlines, and deposits still to come back.' },
     { to: '/renewals', title: 'Renewals and reorders', text: 'Warranties and AMCs ending, and consumables due.' },

@@ -34,6 +34,9 @@ import Notifications from './pages/Notifications';
 import SyncStatus from './pages/SyncStatus';
 import Approvals from './pages/companies/Approvals';
 import Account from './pages/Account';
+import ServiceReports from './pages/service/ServiceReports';
+import ServiceReportForm from './pages/service/ServiceReportForm';
+import ServiceReportDetail from './pages/service/ServiceReportDetail';
 import { SetPassword } from './pages/PasswordFlows';
 import Products, { ProductDetail } from './pages/products/Products';
 
@@ -60,6 +63,10 @@ export default function App() {
         <Route path="companies" element={<Companies />} />
         <Route path="companies/:id" element={<CompanyDetail />} />
         <Route path="tasks" element={<Tasks />} />
+        <Route path="service-reports" element={<ServiceReports />} />
+        {canWriteCrm(user.role) && <Route path="service-reports/new" element={<ServiceReportForm />} />}
+        {canWriteCrm(user.role) && <Route path="service-reports/:id/edit" element={<ServiceReportForm />} />}
+        <Route path="service-reports/:id" element={<ServiceReportDetail />} />
         <Route path="pipeline" element={<Pipeline />} />
         <Route path="pipeline/:id" element={<DealDetail />} />
         <Route path="products" element={<Products />} />

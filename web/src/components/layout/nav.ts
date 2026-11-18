@@ -14,6 +14,7 @@ export const NAV: NavEntry[] = [
     { label: 'Opportunities', path: '/opportunities', desc: 'Every opportunity, as a list' },
     { label: 'Pipeline', path: '/pipeline', desc: 'Opportunities by stage' },
     { label: 'Follow-ups', path: '/tasks', desc: 'What needs doing next' },
+    { label: 'Service reports', path: '/service-reports', desc: 'Field service reports with signatures' },
     { label: 'Quotation requests', path: '/quotation-requests', desc: 'Requests waiting for a quotation', show: canRecordQuotations },
   ] },
   { kind: 'group', key: 'accounts', label: 'Accounts', items: [

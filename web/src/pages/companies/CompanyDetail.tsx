@@ -190,6 +190,11 @@ function CompanyPage({ id }: { id: number }) {
         </div>
         <span className="ts-grow" />
         {writer && c.approval_status !== 'rejected' && (
+          <Link to={`/service-reports/new?company=${c.id}`} className="shrink-0 ts-btn justify-center max-[860px]:min-h-11">
+            + Service report
+          </Link>
+        )}
+        {writer && c.approval_status !== 'rejected' && (
           <Link to={`/opportunities/new?company=${c.id}`} className="shrink-0 ts-btn ts-dark justify-center max-[860px]:min-h-11">
             + New opportunity
           </Link>
