@@ -16,9 +16,12 @@ let _pool = null;
 
 export function getPool() {
   if (!_pool) {
-    const connStr = process.env.DATABASE_URL || process.env.DATABASE_URL1 || process.env.POSTGRES_URL;
+    let connStr = process.env.DATABASE_URL || process.env.DATABASE_URL1 || process.env.POSTGRES_URL;
     if (!connStr) {
       throw new Error("DATABASE_URL is not set. Copy .env.example to .env and point it at this app's own Postgres database.");
+    }
+    if (connStr.includes('pooler.supabase.com:5432')) {
+      connStr = connStr.replace('pooler.supabase.com:5432', 'pooler.supabase.com:6543');
     }
     _pool = new Pool(poolOptions(process.env, connStr));
     _pool.on('error', (err) => {
