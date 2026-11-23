@@ -134,6 +134,7 @@ function nameListRouter({ table, entity, label, inUseSql, ordered = false }) {
 
   router.get('/', async (req, res) => {
     try {
+      res.setHeader('Cache-Control', 'private, max-age=120, stale-while-revalidate=600');
       const includeInactive = req.query.include_inactive === '1' && isAdminRole(req.user.role);
       res.json(
         await db

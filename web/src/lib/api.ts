@@ -105,6 +105,16 @@ export interface AuditEntry {
   actor_username: string | null;
 }
 
+const memCache = new Map<string, { data: unknown; expires: number }>();
+function cachedRequest<T>(key: string, fn: () => Promise<T>, ttlMs = 60000): Promise<T> {
+  const hit = memCache.get(key);
+  if (hit && hit.expires > Date.now()) return Promise.resolve(hit.data as T);
+  return fn().then((res) => {
+    memCache.set(key, { data: res, expires: Date.now() + ttlMs });
+    return res;
+  });
+}
+
 export const api = {
   auth: {
     me: () => request<{ needsSetup?: boolean; user?: SessionUser }>('/auth/me'),
@@ -148,7 +158,9 @@ export const api = {
   today: () => request<TodayData>('/today').then(overlayToday),
   directory: {
     salespeople: (includeInactive = false) =>
-      request<{ id: number; name: string; employee_code: string; is_active: boolean }[]>(`/salespeople${includeInactive ? '?include_inactive=1' : ''}`),
+      cachedRequest(`salespeople:${includeInactive}`, () =>
+        request<{ id: number; name: string; employee_code: string; is_active: boolean }[]>(`/salespeople${includeInactive ? '?include_inactive=1' : ''}`)
+      ),
   },
   companies: {
     // Without signal, searches the company list saved on this device.
@@ -294,12 +306,30 @@ export const api = {
     update: (id: number, data: Partial<ProductInput> & { is_active?: boolean }) => put<Product>(`/products/${id}`, data),
   },
   catalogue: {
-    oems: (includeInactive = false) => request<NamedOption[]>(`/oems${includeInactive ? '?include_inactive=1' : ''}`),
-    createOem: (name: string) => post<NamedOption>('/oems', { name }),
-    updateOem: (id: number, data: { name?: string; is_active?: boolean }) => put<NamedOption>(`/oems/${id}`, data),
-    segments: (includeInactive = false) => request<NamedOption[]>(`/market-segments${includeInactive ? '?include_inactive=1' : ''}`),
-    createSegment: (name: string) => post<NamedOption>('/market-segments', { name }),
-    updateSegment: (id: number, data: { name?: string; is_active?: boolean }) => put<NamedOption>(`/market-segments/${id}`, data),
+    oems: (includeInactive = false) =>
+      cachedRequest(`oems:${includeInactive}`, () => request<NamedOption[]>(`/oems${includeInactive ? '?include_inactive=1' : ''}`)),
+    createOem: (name: string) => {
+      memCache.delete('oems:false');
+      memCache.delete('oems:true');
+      return post<NamedOption>('/oems', { name });
+    },
+    updateOem: (id: number, data: { name?: string; is_active?: boolean }) => {
+      memCache.delete('oems:false');
+      memCache.delete('oems:true');
+      return put<NamedOption>(`/oems/${id}`, data);
+    },
+    segments: (includeInactive = false) =>
+      cachedRequest(`segments:${includeInactive}`, () => request<NamedOption[]>(`/market-segments${includeInactive ? '?include_inactive=1' : ''}`)),
+    createSegment: (name: string) => {
+      memCache.delete('segments:false');
+      memCache.delete('segments:true');
+      return post<NamedOption>('/market-segments', { name });
+    },
+    updateSegment: (id: number, data: { name?: string; is_active?: boolean }) => {
+      memCache.delete('segments:false');
+      memCache.delete('segments:true');
+      return put<NamedOption>(`/market-segments/${id}`, data);
+    },
   },
   analysis: {
     funnel: (params: { days?: number; salesperson_id?: number | ''; oem_id?: number | '' }) => request<Funnel>(`/analysis/funnel${qs(params)}`),

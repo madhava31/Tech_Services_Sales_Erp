@@ -21,8 +21,6 @@ export function getPool() {
       throw new Error("DATABASE_URL is not set. Copy .env.example to .env and point it at this app's own Postgres database.");
     }
     _pool = new Pool(poolOptions(process.env, connStr));
-    // pg-pool emits 'error' when an *idle* pooled connection dies (database restarted, network drop).
-    // With no listener Node would crash the whole server; this lets the pool discard it and reconnect.
     _pool.on('error', (err) => {
       console.error('Postgres pool error (idle client):', err.message);
     });

@@ -2,13 +2,14 @@ import { Router } from 'express';
 import crypto from 'node:crypto';
 import db from '../db/index.js';
 import { hashPassword, verifyPassword, isAcceptablePassword, PASSWORD_RULE } from '../auth/password.js';
-import { getSessionUser, toSessionUser } from '../auth/middleware.js';
+import { getSessionUser, toSessionUser, invalidateSession } from '../auth/middleware.js';
 import { recordAudit } from '../audit/log.js';
 
 const router = Router();
 const SESSION_DAYS = 30;
 const COOKIE_NAME = 'session';
 const isProduction = process.env.NODE_ENV === 'production';
+let _hasUsers = null;
 
 // Password-guessing throttle, backed by the login_attempt table. A username is locked after
 // MAX_FAILURES_PER_USERNAME failures since its last successful sign-in within the window; an IP
@@ -54,8 +55,11 @@ async function createSession(userId, res) {
 
 router.get('/me', async (req, res) => {
   try {
-    const userCount = (await db.prepare(`SELECT COUNT(*) c FROM app_user`).get()).c;
-    if (Number(userCount) === 0) return res.json({ needsSetup: true });
+    if (_hasUsers !== true) {
+      const userCount = (await db.prepare(`SELECT COUNT(*) c FROM app_user`).get()).c;
+      if (Number(userCount) === 0) return res.json({ needsSetup: true });
+      _hasUsers = true;
+    }
 
     const user = await getSessionUser(req.cookies?.session);
     if (!user) return res.status(401).json({ error: 'Not authenticated' });
@@ -154,7 +158,10 @@ router.post('/change-password', async (req, res) => {
 router.post('/logout', async (req, res) => {
   try {
     const token = req.cookies?.session;
-    if (token) await db.prepare(`DELETE FROM session WHERE token = ?`).run(token);
+    if (token) {
+      invalidateSession(token);
+      await db.prepare(`DELETE FROM session WHERE token = ?`).run(token);
+    }
     res.clearCookie(COOKIE_NAME, { path: '/', secure: isProduction, sameSite: 'lax' });
     res.json({ ok: true });
   } catch (err) {

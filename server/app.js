@@ -116,6 +116,111 @@ app.use('/api/admin/audit', requireAdmin, auditRouter);
 app.use('/api/admin/import', requireAdmin, importRouter);
 app.use('/api/admin/erp', requireAdmin, erpSyncRouter);
 app.use('/api/companies', companyDeletionsRouter);
+
+app.post('/api/admin/clean-demo', requireAdmin, async (req, res) => {
+  const pool = db.pool;
+  let step = '';
+  try {
+    step = 'auto_followup';
+    await pool.query(`DELETE FROM auto_followup WHERE task_id IN (SELECT id FROM task WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)'))`);
+
+    step = 'contact_log';
+    await pool.query(`DELETE FROM contact_log WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)')`);
+
+    step = 'installed_instrument';
+    await pool.query(`DELETE FROM installed_instrument WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)')`);
+
+    step = 'reorder_plan';
+    await pool.query(`DELETE FROM reorder_plan WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)')`);
+
+    step = 'tender';
+    await pool.query(`DELETE FROM tender WHERE opportunity_id IN (SELECT id FROM opportunity WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)'))`);
+
+    step = 'quotation_link';
+    await pool.query(`DELETE FROM quotation_link WHERE opportunity_id IN (SELECT id FROM opportunity WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)'))`);
+
+    step = 'opportunity_product';
+    await pool.query(`DELETE FROM opportunity_product WHERE opportunity_id IN (SELECT id FROM opportunity WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)'))`);
+
+    step = 'opportunity_segment';
+    await pool.query(`DELETE FROM opportunity_segment WHERE opportunity_id IN (SELECT id FROM opportunity WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)'))`);
+
+    step = 'opportunity_history';
+    await pool.query(`DELETE FROM opportunity_history WHERE opportunity_id IN (SELECT id FROM opportunity WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)'))`);
+
+    step = 'task';
+    await pool.query(`DELETE FROM task WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)') OR opportunity_id IN (SELECT id FROM opportunity WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)'))`);
+
+    step = 'requirement';
+    await pool.query(`DELETE FROM requirement WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)')`);
+
+    step = 'unlink_visit_opp';
+    await pool.query(`UPDATE visit SET opportunity_id = NULL WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)')`);
+
+    step = 'opportunity';
+    await pool.query(`DELETE FROM opportunity WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)')`);
+
+    step = 'visit';
+    await pool.query(`DELETE FROM visit WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)')`);
+
+    step = 'company_contact';
+    await pool.query(`DELETE FROM company_contact WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)')`);
+
+    step = 'unlink_company_parents';
+    await pool.query(`UPDATE company SET parent_company_id = NULL, merged_into_company_id = NULL WHERE category LIKE '%(Demo)'`);
+
+    step = 'company';
+    const cRes = await pool.query(`DELETE FROM company WHERE category LIKE '%(Demo)'`);
+
+    step = 'salesperson';
+    await pool.query(`DELETE FROM salesperson WHERE employee_code IN ('SE-001', 'SE-002', 'SE-003', 'SE-004', 'SE-005') AND id NOT IN (SELECT salesperson_id FROM app_user WHERE salesperson_id IS NOT NULL)`);
+
+    step = 'product';
+    await pool.query(`DELETE FROM product WHERE part_number LIKE 'DEMO-%'`);
+
+    if (req.body?.cleanUserTests) {
+      step = 'cleanUserTests_auto_followup';
+      await pool.query(`DELETE FROM auto_followup`);
+      step = 'cleanUserTests_contact_log';
+      await pool.query(`DELETE FROM contact_log`);
+      step = 'cleanUserTests_installed_instrument';
+      await pool.query(`DELETE FROM installed_instrument`);
+      step = 'cleanUserTests_reorder_plan';
+      await pool.query(`DELETE FROM reorder_plan`);
+      step = 'cleanUserTests_unlink_visit';
+      await pool.query(`UPDATE visit SET opportunity_id = NULL`);
+      step = 'cleanUserTests_task';
+      await pool.query(`DELETE FROM task`);
+      step = 'cleanUserTests_requirement';
+      await pool.query(`DELETE FROM requirement`);
+      step = 'cleanUserTests_quotation_link';
+      await pool.query(`DELETE FROM quotation_link`);
+      step = 'cleanUserTests_tender';
+      await pool.query(`DELETE FROM tender`);
+      step = 'cleanUserTests_opportunity_product';
+      await pool.query(`DELETE FROM opportunity_product`);
+      step = 'cleanUserTests_opportunity_segment';
+      await pool.query(`DELETE FROM opportunity_segment`);
+      step = 'cleanUserTests_opportunity_history';
+      await pool.query(`DELETE FROM opportunity_history`);
+      step = 'cleanUserTests_opportunity';
+      await pool.query(`DELETE FROM opportunity`);
+      step = 'cleanUserTests_visit';
+      await pool.query(`DELETE FROM visit`);
+      step = 'cleanUserTests_company_contact';
+      await pool.query(`DELETE FROM company_contact`);
+      step = 'cleanUserTests_unlink_company';
+      await pool.query(`UPDATE company SET parent_company_id = NULL, merged_into_company_id = NULL`);
+      step = 'cleanUserTests_company';
+      await pool.query(`DELETE FROM company`);
+    }
+
+    res.json({ ok: true, step: 'done', deletedDemoCompanies: cRes.rowCount });
+  } catch (err) {
+    console.error(`Failed at step "${step}":`, err);
+    res.status(500).json({ error: err.message, step });
+  }
+});
 app.use('/api/companies', companiesRouter);
 app.use('/api/contacts', contactsRouter);
 app.use('/api/visits', visitsRouter);
