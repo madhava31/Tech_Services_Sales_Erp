@@ -35,6 +35,7 @@ export interface DealDraft {
   lostReason: LostReason | '';
   closeReason: string;
   quotationNumber: string;
+  hasOtherOem?: boolean;
   otherMake?: string;
   otherProduct?: string;
   otherComments?: string;
@@ -62,6 +63,7 @@ export const EMPTY_DEAL_DRAFT: DealDraft = {
   lostReason: '',
   closeReason: '',
   quotationNumber: '',
+  hasOtherOem: false,
   otherMake: '',
   otherProduct: '',
   otherComments: '',
@@ -79,7 +81,7 @@ export function dealToDraft(deal: OpportunityDetail): DealDraft {
   if (otherCustom) {
     if (otherCustom.make) {
       otherMake = otherCustom.make;
-      otherProduct = otherCustom.name.replace(new RegExp(`^${otherMake}\\s*-\\s*`), '');
+      const prefix = `${otherMake} - `; otherProduct = otherCustom.name.startsWith(prefix) ? otherCustom.name.slice(prefix.length) : otherCustom.name;
       otherComments = otherCustom.comments || '';
     } else if (otherCustom.name.includes(' - ')) {
       const parts = otherCustom.name.split(' - ');
@@ -99,6 +101,7 @@ export function dealToDraft(deal: OpportunityDetail): DealDraft {
     oemIds: deal.oems.map((o) => String(o.id)),
     productIds: deal.products.map((p) => p.id),
     customProducts: (deal.custom_products ?? []).map((p) => ({ oemId: String(p.oem_id), name: p.name, make: p.make ?? undefined, comments: p.comments ?? undefined })),
+    hasOtherOem: Boolean(otherOem),
     otherMake,
     otherProduct,
     otherComments: otherComments || deal.notes || '',
@@ -121,12 +124,10 @@ const isClosed = (d: DealDraft) => d.stage === CLOSED;
 export function draftToInput(d: DealDraft): DealInput {
   const isNew = d.contactId === NEW_CONTACT;
   let customProducts = [...(d.customProducts ?? [])];
-  if (d.otherProduct?.trim() || d.otherMake?.trim()) {
-    const makeTrimmed = (d.otherMake ?? '').trim();
-    const productTrimmed = (d.otherProduct ?? '').trim();
-    const fullName = makeTrimmed && productTrimmed
-      ? `${makeTrimmed} - ${productTrimmed}`
-      : (productTrimmed || makeTrimmed);
+  const makeTrimmed = (d.otherMake ?? '').trim();
+  const productTrimmed = (d.otherProduct ?? '').trim();
+  if (makeTrimmed && productTrimmed) {
+    const fullName = `${makeTrimmed} - ${productTrimmed}`;
     const otherOemId = d.oemIds.find((id) => !customProducts.some((p) => p.oemId === id)) || d.oemIds[0];
     if (otherOemId && !customProducts.some((p) => p.oemId === otherOemId)) {
       customProducts.push({
@@ -186,9 +187,23 @@ export function dealDraftComplete(d: DealDraft) {
   } else if (QUOTED_STAGES.includes(d.stage as never)) {
     stageOk = d.quotationNumber.trim() !== '';
   }
+
+  // If Other OEM is selected or Other fields are being filled, BOTH Make and Product name are mandatory!
+  const hasOther = Boolean(
+    d.hasOtherOem ||
+    (d.otherMake !== undefined && (d.otherMake.trim() !== '' || d.otherProduct?.trim() !== '' || d.otherComments?.trim() !== ''))
+  );
+  if (hasOther) {
+    if (!d.otherMake?.trim() || !d.otherProduct?.trim()) {
+      return false;
+    }
+  }
+
+  const otherHasValidProduct = Boolean(d.otherMake?.trim() && d.otherProduct?.trim());
   const hasProducts =
     d.productIds.length + (d.customProducts ?? []).length > 0 ||
-    Boolean(d.otherProduct?.trim() || d.otherMake?.trim());
+    otherHasValidProduct;
+
   return Boolean(d.title.trim() && d.oemIds.length > 0 && hasProducts && d.closeDate && Number(d.value) > 0 && contactOk && competitorOk && stageOk);
 }
 
@@ -446,7 +461,15 @@ export default function DealFields({
   const closed = value.stage === CLOSED;
 
   const customProducts = value.customProducts ?? [];
-  const addOem = (id: string) => id && !value.oemIds.includes(id) && onChange({ oemIds: [...value.oemIds, id] });
+  const addOem = (id: string) => {
+    if (!id || value.oemIds.includes(id)) return;
+    const oem = oemById(id);
+    const isOther = oem?.name.toLowerCase() === 'other' || id === '-999';
+    onChange({
+      oemIds: [...value.oemIds, id],
+      ...(isOther ? { hasOtherOem: true } : {}),
+    });
+  };
   // Taking an OEM off also takes off its products.
   const removeOem = (id: string) => {
     const oem = oemById(id);
@@ -456,7 +479,7 @@ export default function DealFields({
       oemIds: value.oemIds.filter((x) => x !== id),
       productIds: value.productIds.filter((p) => !theirs.has(p)),
       customProducts: customProducts.filter((p) => p.oemId !== id),
-      ...(isOther ? { otherMake: '', otherProduct: '', otherComments: '' } : {}),
+      ...(isOther ? { otherMake: '', otherProduct: '', otherComments: '', hasOtherOem: false } : {}),
     });
   };
 
@@ -469,16 +492,13 @@ export default function DealFields({
     const productTrimmed = newProduct.trim();
     const commentsTrimmed = newComments.trim();
 
-    const fullName = makeTrimmed && productTrimmed
-      ? `${makeTrimmed} - ${productTrimmed}`
-      : (productTrimmed || makeTrimmed);
-
     const others = (value.customProducts ?? []).filter((p) => p.oemId !== oemId);
-    const updatedCustom = fullName
-      ? [...others, { oemId, name: fullName, make: makeTrimmed, comments: commentsTrimmed }]
+    const updatedCustom = (makeTrimmed && productTrimmed)
+      ? [...others, { oemId, name: `${makeTrimmed} - ${productTrimmed}`, make: makeTrimmed, comments: commentsTrimmed }]
       : others;
 
     const updates: Partial<DealDraft> = {
+      hasOtherOem: true,
       otherMake: newMake,
       otherProduct: newProduct,
       otherComments: newComments,
@@ -561,6 +581,12 @@ export default function DealFields({
           const isOther = oem?.name.toLowerCase() === 'other' || oemId === '-999';
 
           if (isOther) {
+            const makeVal = value.otherMake ?? '';
+            const productVal = value.otherProduct ?? '';
+            const hasMake = Boolean(makeVal.trim());
+            const hasProduct = Boolean(productVal.trim());
+            const showWarning = !hasMake || !hasProduct;
+
             return (
               <div key={oemId} className="ts-span2 min-w-0 p-4 border border-line rounded-lg bg-surface flex flex-col gap-3">
                 <div className="flex items-center justify-between">
@@ -569,20 +595,31 @@ export default function DealFields({
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <TextField
-                    label="Make"
-                    value={value.otherMake ?? ''}
+                    label="Make *"
+                    value={makeVal}
                     onChange={(e) => handleOtherChange(oemId, { make: e.target.value })}
                     placeholder="e.g. Waters, Thermo Fisher, Shimadzu"
+                    hint={!hasMake ? 'Make is required' : undefined}
                     required
                   />
                   <TextField
-                    label="Product name"
-                    value={value.otherProduct ?? ''}
+                    label="Product name *"
+                    value={productVal}
                     onChange={(e) => handleOtherChange(oemId, { product: e.target.value })}
                     placeholder="e.g. Alliance HPLC, GC-MS System"
+                    hint={!hasProduct ? 'Product name is required' : undefined}
                     required
                   />
                 </div>
+                {showWarning && (
+                  <p className="text-xs text-danger font-medium">
+                    {!hasMake && !hasProduct
+                      ? 'Both Make and Product name are mandatory.'
+                      : !hasMake
+                      ? 'Make is mandatory.'
+                      : 'Product name is mandatory.'}
+                  </p>
+                )}
                 <div className="min-w-0">
                   <TextAreaField
                     label="Comments"

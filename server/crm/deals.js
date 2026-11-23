@@ -82,7 +82,24 @@ export async function parseDealFields(body, { companyId, keepOemIds = [], keepPr
     if (!p.is_active && !keepProductIds.includes(p.id)) throw new HttpError(400, `${p.name} is no longer active.`);
   }
   for (const oem of oems) {
-    if (!products.some((p) => p.oem_id === oem.id) && !customProducts.some((p) => p.oem_id === oem.id)) throw new HttpError(400, `Choose at least one ${oem.name} product, or remove ${oem.name}.`);
+    if (oem.name.toLowerCase() === 'other') {
+      const items = customProducts.filter((p) => p.oem_id === oem.id);
+      if (items.length === 0) {
+        throw new HttpError(400, 'Make and Product name are required for Other OEM.');
+      }
+      for (const item of items) {
+        if (!item.make || !item.make.trim()) {
+          throw new HttpError(400, 'Make is required for Other OEM.');
+        }
+        if (!item.name || !item.name.trim()) {
+          throw new HttpError(400, 'Product name is required for Other OEM.');
+        }
+      }
+    } else {
+      if (!products.some((p) => p.oem_id === oem.id) && !customProducts.some((p) => p.oem_id === oem.id)) {
+        throw new HttpError(400, `Choose at least one ${oem.name} product, or remove ${oem.name}.`);
+      }
+    }
   }
 
   // Who else is bidding: not known, nobody, or a named competitor.
