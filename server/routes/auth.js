@@ -65,7 +65,7 @@ router.get('/me', async (req, res) => {
     if (!user) return res.status(401).json({ error: 'Not authenticated' });
     res.json({ user });
   } catch (err) {
-    res.status(500).json({ error: 'Unable to check authentication status. Please try again.' });
+    res.status(500).json({ error: 'Unable to check authentication status. Please try again.', detail: err.message });
   }
 });
 
@@ -116,7 +116,7 @@ router.post('/login', async (req, res) => {
     await createSession(row.id, res);
     res.json({ user: toSessionUser(row) });
   } catch (err) {
-    res.status(500).json({ error: 'Unable to sign in. Please try again.' });
+    res.status(500).json({ error: 'Unable to sign in. Please try again.', detail: err.message });
   }
 });
 
