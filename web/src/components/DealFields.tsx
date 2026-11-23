@@ -18,7 +18,7 @@ export interface DealDraft {
   oemIds: string[];
   productIds: number[];
   // Products typed in for this opportunity only, under one of its OEMs.
-  customProducts: { oemId: string; name: string }[];
+  customProducts: { oemId: string; name: string; make?: string; comments?: string }[];
   closeDate: string;
   probability: number;
   probabilityReason: string;
@@ -35,6 +35,9 @@ export interface DealDraft {
   lostReason: LostReason | '';
   closeReason: string;
   quotationNumber: string;
+  otherMake?: string;
+  otherProduct?: string;
+  otherComments?: string;
 }
 
 export const EMPTY_DEAL_DRAFT: DealDraft = {
@@ -59,16 +62,46 @@ export const EMPTY_DEAL_DRAFT: DealDraft = {
   lostReason: '',
   closeReason: '',
   quotationNumber: '',
+  otherMake: '',
+  otherProduct: '',
+  otherComments: '',
 };
 
 export function dealToDraft(deal: OpportunityDetail): DealDraft {
+  const otherOem = deal.oems.find((o) => o.name.toLowerCase() === 'other');
+  const otherCustom = otherOem
+    ? (deal.custom_products ?? []).find((p) => String(p.oem_id) === String(otherOem.id))
+    : null;
+
+  let otherMake = '';
+  let otherProduct = '';
+  let otherComments = '';
+  if (otherCustom) {
+    if (otherCustom.make) {
+      otherMake = otherCustom.make;
+      otherProduct = otherCustom.name.replace(new RegExp(`^${otherMake}\\s*-\\s*`), '');
+      otherComments = otherCustom.comments || '';
+    } else if (otherCustom.name.includes(' - ')) {
+      const parts = otherCustom.name.split(' - ');
+      otherMake = parts[0].trim();
+      otherProduct = parts.slice(1).join(' - ').trim();
+      otherComments = otherCustom.comments || '';
+    } else {
+      otherProduct = otherCustom.name;
+      otherComments = otherCustom.comments || '';
+    }
+  }
+
   return {
     ...EMPTY_DEAL_DRAFT,
     title: deal.title,
     contactId: deal.contact_id ? String(deal.contact_id) : '',
     oemIds: deal.oems.map((o) => String(o.id)),
     productIds: deal.products.map((p) => p.id),
-    customProducts: (deal.custom_products ?? []).map((p) => ({ oemId: String(p.oem_id), name: p.name })),
+    customProducts: (deal.custom_products ?? []).map((p) => ({ oemId: String(p.oem_id), name: p.name, make: p.make ?? undefined, comments: p.comments ?? undefined })),
+    otherMake,
+    otherProduct,
+    otherComments: otherComments || deal.notes || '',
     closeDate: deal.expected_close_date ?? '',
     probability: deal.probability,
     probabilityReason: deal.probability_reason ?? '',
@@ -87,18 +120,41 @@ const isClosed = (d: DealDraft) => d.stage === CLOSED;
 
 export function draftToInput(d: DealDraft): DealInput {
   const isNew = d.contactId === NEW_CONTACT;
+  let customProducts = [...(d.customProducts ?? [])];
+  if (d.otherProduct?.trim() || d.otherMake?.trim()) {
+    const makeTrimmed = (d.otherMake ?? '').trim();
+    const productTrimmed = (d.otherProduct ?? '').trim();
+    const fullName = makeTrimmed && productTrimmed
+      ? `${makeTrimmed} - ${productTrimmed}`
+      : (productTrimmed || makeTrimmed);
+    const otherOemId = d.oemIds.find((id) => !customProducts.some((p) => p.oemId === id)) || d.oemIds[0];
+    if (otherOemId && !customProducts.some((p) => p.oemId === otherOemId)) {
+      customProducts.push({
+        oemId: otherOemId,
+        name: fullName,
+        make: makeTrimmed,
+        comments: (d.otherComments ?? '').trim(),
+      });
+    }
+  }
+
   const input: DealInput = {
     title: d.title,
     oem_ids: d.oemIds.map(Number),
     product_ids: d.productIds,
-    custom_products: (d.customProducts ?? []).map((p) => ({ oem_id: Number(p.oemId), name: p.name })),
+    custom_products: customProducts.map((p) => ({
+      oem_id: Number(p.oemId),
+      name: p.name,
+      make: p.make || null,
+      comments: p.comments || null,
+    })),
     expected_close_date: d.closeDate,
     probability: d.probability,
     probability_reason: d.probabilityReason || null,
     estimated_value: Number(d.value),
     tender: d.tender,
     segment_ids: d.segmentIds,
-    notes: d.comments || null,
+    notes: d.comments || d.otherComments || null,
     competitor: d.competitor || null,
     competitor_note: d.competitor === 'other' ? d.competitorNote.trim() || null : null,
     contact_id: !isNew && d.contactId ? Number(d.contactId) : null,
@@ -130,7 +186,10 @@ export function dealDraftComplete(d: DealDraft) {
   } else if (QUOTED_STAGES.includes(d.stage as never)) {
     stageOk = d.quotationNumber.trim() !== '';
   }
-  return Boolean(d.title.trim() && d.oemIds.length > 0 && d.productIds.length + (d.customProducts ?? []).length > 0 && d.closeDate && Number(d.value) > 0 && contactOk && competitorOk && stageOk);
+  const hasProducts =
+    d.productIds.length + (d.customProducts ?? []).length > 0 ||
+    Boolean(d.otherProduct?.trim() || d.otherMake?.trim());
+  return Boolean(d.title.trim() && d.oemIds.length > 0 && hasProducts && d.closeDate && Number(d.value) > 0 && contactOk && competitorOk && stageOk);
 }
 
 function CheckList<T extends { id: number }>({
@@ -364,7 +423,18 @@ export default function DealFields({
   }, [value.oemIds, productsByOem]);
 
   const keptOems = (keep?.oems ?? []).filter((o) => !oems.some((x) => x.id === o.id)).map((o) => ({ ...o, in_use: 0 }));
-  const allOems: NamedOption[] = [...oems, ...keptOems];
+  const rawOems: NamedOption[] = [...oems, ...keptOems];
+  const hasOtherInOems = rawOems.some((o) => o.name.toLowerCase() === 'other');
+  const allOems: NamedOption[] = hasOtherInOems
+    ? rawOems
+    : [...rawOems, { id: -999, name: 'Other', is_active: true, in_use: 0 }];
+
+  const otherOem = allOems.find((o) => o.name.toLowerCase() === 'other')!;
+  const regularOems = allOems
+    .filter((o) => o.name.toLowerCase() !== 'other')
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const sortedOems = [...regularOems, otherOem];
+
   const oemById = (id: string) => allOems.find((o) => String(o.id) === id);
   const choicesFor = (oemId: string): ProductChoice[] => {
     const loaded = productsByOem[oemId] ?? [];
@@ -379,12 +449,47 @@ export default function DealFields({
   const addOem = (id: string) => id && !value.oemIds.includes(id) && onChange({ oemIds: [...value.oemIds, id] });
   // Taking an OEM off also takes off its products.
   const removeOem = (id: string) => {
+    const oem = oemById(id);
+    const isOther = oem?.name.toLowerCase() === 'other' || id === '-999';
     const theirs = new Set(choicesFor(id).map((p) => p.id));
     onChange({
       oemIds: value.oemIds.filter((x) => x !== id),
       productIds: value.productIds.filter((p) => !theirs.has(p)),
       customProducts: customProducts.filter((p) => p.oemId !== id),
+      ...(isOther ? { otherMake: '', otherProduct: '', otherComments: '' } : {}),
     });
+  };
+
+  const handleOtherChange = (oemId: string, patch: { make?: string; product?: string; comments?: string }) => {
+    const newMake = patch.make !== undefined ? patch.make : (value.otherMake ?? '');
+    const newProduct = patch.product !== undefined ? patch.product : (value.otherProduct ?? '');
+    const newComments = patch.comments !== undefined ? patch.comments : (value.otherComments ?? value.comments ?? '');
+
+    const makeTrimmed = newMake.trim();
+    const productTrimmed = newProduct.trim();
+    const commentsTrimmed = newComments.trim();
+
+    const fullName = makeTrimmed && productTrimmed
+      ? `${makeTrimmed} - ${productTrimmed}`
+      : (productTrimmed || makeTrimmed);
+
+    const others = (value.customProducts ?? []).filter((p) => p.oemId !== oemId);
+    const updatedCustom = fullName
+      ? [...others, { oemId, name: fullName, make: makeTrimmed, comments: commentsTrimmed }]
+      : others;
+
+    const updates: Partial<DealDraft> = {
+      otherMake: newMake,
+      otherProduct: newProduct,
+      otherComments: newComments,
+      customProducts: updatedCustom,
+    };
+
+    if (patch.comments !== undefined) {
+      updates.comments = newComments;
+    }
+
+    onChange(updates);
   };
 
   return (
@@ -425,7 +530,7 @@ export default function DealFields({
           required={value.oemIds.length === 0}
         >
           <option value="">{value.oemIds.length ? '+ Add another OEM…' : 'Select…'}</option>
-          {allOems
+          {sortedOems
             .filter((o) => !value.oemIds.includes(String(o.id)))
             .map((o) => (
               <option key={o.id} value={o.id}>
@@ -453,6 +558,44 @@ export default function DealFields({
       ) : (
         value.oemIds.map((oemId) => {
           const oem = oemById(oemId);
+          const isOther = oem?.name.toLowerCase() === 'other' || oemId === '-999';
+
+          if (isOther) {
+            return (
+              <div key={oemId} className="ts-span2 min-w-0 p-4 border border-line rounded-lg bg-surface flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-fg">Other Make &amp; Product Details</span>
+                  <span className="text-xs text-subtle">Equipment not in standard catalogue</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <TextField
+                    label="Make"
+                    value={value.otherMake ?? ''}
+                    onChange={(e) => handleOtherChange(oemId, { make: e.target.value })}
+                    placeholder="e.g. Waters, Thermo Fisher, Shimadzu"
+                    required
+                  />
+                  <TextField
+                    label="Product name"
+                    value={value.otherProduct ?? ''}
+                    onChange={(e) => handleOtherChange(oemId, { product: e.target.value })}
+                    placeholder="e.g. Alliance HPLC, GC-MS System"
+                    required
+                  />
+                </div>
+                <div className="min-w-0">
+                  <TextAreaField
+                    label="Comments"
+                    value={value.otherComments ?? value.comments ?? ''}
+                    onChange={(e) => handleOtherChange(oemId, { comments: e.target.value })}
+                    placeholder="Write any specifications, lab requirements, or comments here..."
+                    rows={3}
+                  />
+                </div>
+              </div>
+            );
+          }
+
           const choices = choicesFor(oemId);
           const others = customProducts.filter((p) => p.oemId === oemId).map((p) => p.name);
           const picked = choices.filter((p) => value.productIds.includes(p.id)).length + others.length;

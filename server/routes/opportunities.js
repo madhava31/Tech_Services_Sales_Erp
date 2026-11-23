@@ -28,10 +28,20 @@ import {
 import { assertCompanyAcceptsDeals, insertOpportunity, parseDealFields, replaceDealLinks, resolveDealContact } from '../crm/deals.js';
 import { auditHandover, transferDeals } from '../crm/handover.js';
 import { DAYS_IN_STAGE_SQL, STUCK_AFTER_SQL, STUCK_SQL } from '../crm/stuck.js';
+import { ensureOtherOemSchema } from '../db/otherOemSchema.js';
 
 // Mounted at /api/opportunities. Deals move through the pipeline; every stage, owner and field change
 // is kept in opportunity_history and written to the audit log.
 const router = Router();
+
+router.use(async (req, res, next) => {
+  try {
+    await ensureOtherOemSchema(db.pool);
+    next();
+  } catch (err) {
+    sendError(res, err);
+  }
+});
 
 const OPEN_SQL = `o.stage NOT IN ('won', 'lost')`;
 const OVERDUE_SQL = `(${OPEN_SQL} AND o.expected_close_date < ${TODAY_SQL})`;
@@ -58,7 +68,7 @@ const OPPORTUNITY_SELECT = `
          (SELECT COUNT(*)::int FROM quotation_link q WHERE q.opportunity_id = o.id) AS quotation_count,
          (SELECT COALESCE(json_agg(json_build_object('id', p.id, 'part_number', p.part_number, 'name', p.name, 'oem_id', p.oem_id, 'is_active', p.is_active) ORDER BY p.name), '[]')
           FROM opportunity_product op JOIN product p ON p.id = op.product_id WHERE op.opportunity_id = o.id) AS products,
-         (SELECT COALESCE(json_agg(json_build_object('id', cp.id, 'name', cp.name, 'oem_id', cp.oem_id) ORDER BY cp.name), '[]')
+         (SELECT COALESCE(json_agg(json_build_object('id', cp.id, 'name', cp.name, 'oem_id', cp.oem_id, 'make', cp.make, 'comments', cp.comments) ORDER BY cp.name), '[]')
           FROM opportunity_custom_product cp WHERE cp.opportunity_id = o.id) AS custom_products,
          (SELECT COALESCE(json_agg(json_build_object('id', s.id, 'name', s.name, 'is_active', s.is_active) ORDER BY s.name), '[]')
           FROM opportunity_segment os JOIN market_segment s ON s.id = os.segment_id WHERE os.opportunity_id = o.id) AS segments

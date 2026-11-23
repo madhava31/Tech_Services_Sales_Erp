@@ -8,6 +8,7 @@ import db from './db/index.js';
 
 import { requireAuth, requireAdmin } from './auth/middleware.js';
 import { ensureServiceReportSchema } from './db/serviceReportSchema.js';
+import { ensureOtherOemSchema } from './db/otherOemSchema.js';
 import cronRouter from './routes/cron.js';
 import authRouter from './routes/auth.js';
 import serviceReportsRouter from './routes/serviceReports.js';
@@ -247,7 +248,8 @@ app.post('/api/admin/clean-demo', requireAdmin, async (req, res) => {
 app.post('/api/admin/migrate', requireAdmin, async (req, res) => {
   try {
     await ensureServiceReportSchema(db.pool);
-    res.json({ ok: true, message: 'All migrations up to 0023 ensured successfully.' });
+    await ensureOtherOemSchema(db.pool);
+    res.json({ ok: true, message: 'All migrations up to 0024 ensured successfully.' });
   } catch (err) {
     console.error('Migration error:', err);
     res.status(500).json({ error: err.message });

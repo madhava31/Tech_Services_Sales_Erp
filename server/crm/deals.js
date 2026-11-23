@@ -25,7 +25,9 @@ function customProductList(body, oemIds) {
     const key = `${oemId}:${name.toLowerCase()}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ oem_id: oemId, name });
+    const make = typeof item?.make === 'string' ? item.make.trim().replace(/\s+/g, ' ').slice(0, 120) : null;
+    const comments = typeof item?.comments === 'string' ? item.comments.trim().slice(0, 2000) : null;
+    out.push({ oem_id: oemId, name, make, comments });
   }
   return out;
 }
@@ -142,7 +144,11 @@ export async function replaceDealLinks(opportunityId, { oem_ids: oemIds, product
   for (const id of segmentIds) await db.prepare(`INSERT INTO opportunity_segment (opportunity_id, segment_id) VALUES (?, ?)`).run(opportunityId, id);
   // Products typed in for this opportunity only.
   await db.prepare(`DELETE FROM opportunity_custom_product WHERE opportunity_id = ?`).run(opportunityId);
-  for (const p of customProducts) await db.prepare(`INSERT INTO opportunity_custom_product (opportunity_id, oem_id, name) VALUES (?, ?, ?)`).run(opportunityId, p.oem_id, p.name);
+  for (const p of customProducts) {
+    await db
+      .prepare(`INSERT INTO opportunity_custom_product (opportunity_id, oem_id, name, make, comments) VALUES (?, ?, ?, ?, ?)`)
+      .run(opportunityId, p.oem_id, p.name, p.make ?? null, p.comments ?? null);
+  }
 }
 
 // Inserts a deal, its links and its "created" history row, inside the caller's transaction. The
