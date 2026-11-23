@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { api, ApiError, CompanyDetail as Company, CompanySummary } from '../../lib/api';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { api, ApiError, CompanyDetail as Company, CompanySummary, NamedOption } from '../../lib/api';
 import CompanyPicker from '../../components/CompanyPicker';
 import InstalledBaseCard, { ReordersCard } from '../../components/InstalledBase';
 import { useAuth } from '../../lib/auth';
@@ -10,7 +10,8 @@ import ContactLogCard from '../../components/ContactLogCard';
 import DealFields, { DealDraft, EMPTY_DEAL_DRAFT, dealDraftComplete, draftToInput } from '../../components/DealFields';
 import OwnerField, { useOwnerChoice } from '../../components/OwnerField';
 import { canWriteCrm, isManagingRole } from '../../lib/roles';
-import { Badge, Button, Card, CardHeader, EmptyState, Notice, OverdueBadge, PhoneField, TextAreaField, TextField, LoadingCard } from '../../components/ui';
+import { Badge, Button, Card, CardHeader, EmptyState, Notice, OverdueBadge, PhoneField, SelectField, TextAreaField, TextField, LoadingCard } from '../../components/ui';
+import { INDIAN_STATES } from '../../lib/india';
 
 function CompanyChooser({
   title,
@@ -89,6 +90,7 @@ export default function CompanyDetail() {
 function CompanyPage({ id }: { id: number }) {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const company = useLoad<Company | null>(
     () =>
       api.companies.get(id).catch((err) => {
@@ -114,6 +116,81 @@ function CompanyPage({ id }: { id: number }) {
   const [busy, setBusy] = useState(false);
   const c = company.data;
   const owner = useOwnerChoice();
+
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    city: '',
+    state: '',
+    phone: '',
+    email: '',
+    address: '',
+    pincode: '',
+    contact_person: '',
+    category: '',
+    gstin: '',
+  });
+  const [editError, setEditError] = useState('');
+  const [editBusy, setEditBusy] = useState(false);
+  const [categories, setCategories] = useState<NamedOption[]>([]);
+
+  useEffect(() => {
+    if (managing) {
+      api.catalogue.segments().then(setCategories).catch(() => setCategories([]));
+    }
+  }, [managing]);
+
+  function startEditing() {
+    if (!c) return;
+    setEditForm({
+      name: c.name || '',
+      city: c.city || '',
+      state: c.state || '',
+      phone: c.phone || '',
+      email: c.email || '',
+      address: c.address || '',
+      pincode: c.pincode || '',
+      contact_person: c.contact_person || '',
+      category: c.category || '',
+      gstin: c.gstin || '',
+    });
+    setEditError('');
+    setEditing(true);
+  }
+
+  useEffect(() => {
+    if (searchParams.get('edit') === '1' && c && !editing) {
+      startEditing();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, c]);
+
+  async function saveCompanyDetails(e: React.FormEvent) {
+    e.preventDefault();
+    if (!c) return;
+    setEditBusy(true);
+    setEditError('');
+    try {
+      await api.companies.update(c.id, {
+        name: editForm.name.trim(),
+        city: editForm.city.trim() || undefined,
+        state: editForm.state.trim() || undefined,
+        phone: editForm.phone.trim() || undefined,
+        email: editForm.email.trim() || undefined,
+        address: editForm.address.trim() || undefined,
+        pincode: editForm.pincode.trim() || undefined,
+        contact_person: editForm.contact_person.trim() || undefined,
+        category: editForm.category.trim() || undefined,
+        gstin: editForm.gstin.trim() || undefined,
+      });
+      setEditing(false);
+      await company.reload();
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : 'Could not save company details.');
+    } finally {
+      setEditBusy(false);
+    }
+  }
 
   async function saveDeal(e: React.FormEvent) {
     e.preventDefault();
@@ -189,6 +266,11 @@ function CompanyPage({ id }: { id: number }) {
           </div>
         </div>
         <span className="ts-grow" />
+        {managing && !editing && (
+          <Button variant="secondary" onClick={startEditing} className="shrink-0 max-[860px]:min-h-11">
+            Edit details
+          </Button>
+        )}
         {writer && c.approval_status !== 'rejected' && (
           <Link to={`/service-reports/new?company=${c.id}`} className="shrink-0 ts-btn justify-center max-[860px]:min-h-11">
             + Service report
@@ -200,6 +282,50 @@ function CompanyPage({ id }: { id: number }) {
           </Link>
         )}
       </header>
+
+      {editing && (
+        <Card>
+          <CardHeader title="Edit company details" description={`Update registered details for ${c.name}.`} />
+          <form onSubmit={saveCompanyDetails} className="p-4 sm:p-5 flex flex-col gap-4">
+            {editError && <Notice tone="error">{editError}</Notice>}
+            <div className="ts-fgrid ts-g2 !mt-0">
+              <TextField label="Company name" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required autoFocus />
+              <SelectField label="Category" value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}>
+                <option value="">Select…</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.name}>
+                    {cat.name}
+                  </option>
+                ))}
+              </SelectField>
+              <TextField label="City" value={editForm.city} onChange={(e) => setEditForm({ ...editForm, city: e.target.value })} />
+              <SelectField label="State" value={editForm.state} onChange={(e) => setEditForm({ ...editForm, state: e.target.value })}>
+                <option value="">Select…</option>
+                {(editForm.state && !INDIAN_STATES.includes(editForm.state) ? [editForm.state, ...INDIAN_STATES] : INDIAN_STATES).map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </SelectField>
+              <TextField label="Address" value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} />
+              <TextField label="Pin code" inputMode="numeric" maxLength={6} value={editForm.pincode} onChange={(e) => setEditForm({ ...editForm, pincode: e.target.value.replace(/\D/g, '') })} />
+              <TextField label="Contact person" value={editForm.contact_person} onChange={(e) => setEditForm({ ...editForm, contact_person: e.target.value })} />
+              <PhoneField label="Company phone" value={editForm.phone} onChange={(phone) => setEditForm({ ...editForm, phone })} />
+              <TextField label="Company email" type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} />
+              <TextField label="GSTIN" maxLength={20} value={editForm.gstin} onChange={(e) => setEditForm({ ...editForm, gstin: e.target.value.toUpperCase() })} />
+            </div>
+
+            <div className="flex gap-2 mt-2">
+              <Button type="submit" disabled={editBusy || !editForm.name.trim()}>
+                {editBusy ? 'Saving…' : 'Save changes'}
+              </Button>
+              <Button variant="ghost" onClick={() => setEditing(false)} disabled={editBusy}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </Card>
+      )}
 
       {error && <Notice tone="error" onDismiss={() => setError('')}>{error}</Notice>}
       {c.approval_status === 'pending' && (
@@ -241,6 +367,9 @@ function CompanyPage({ id }: { id: number }) {
 
       {managing && (
         <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant={editing ? 'secondary' : 'ghost'} onClick={() => (editing ? setEditing(false) : startEditing())}>
+            {editing ? 'Close edit' : 'Edit company'}
+          </Button>
           <Button size="sm" variant="ghost" onClick={() => setPanel(panel === 'parent' ? null : 'parent')}>
             {c.parent ? 'Change parent company' : 'Make this a branch'}
           </Button>

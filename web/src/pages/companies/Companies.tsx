@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, CompanySummary } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
-import { canWriteCrm } from '../../lib/roles';
+import { canWriteCrm, isManagingRole } from '../../lib/roles';
 import CompanyPicker from '../../components/CompanyPicker';
 import { Badge, Button, Card, DESKTOP_ONLY, EmptyState, Notice, PHONE_ONLY, PageHeader, SearchBox, SkeletonRows, rowStagger } from '../../components/ui';
 
@@ -79,6 +79,11 @@ export default function Companies() {
                             <Link to={`/companies/${c.id}`} className="ts-btn ts-ghost ts-xs">
                               View
                             </Link>
+                            {isManagingRole(user?.role) && (
+                              <Link to={`/companies/${c.id}?edit=1`} className="ts-btn ts-ghost ts-xs">
+                                Edit
+                              </Link>
+                            )}
                           </div>
                         </td>
                       </tr>
