@@ -6,9 +6,9 @@ export function poolOptions(env = process.env, connectionString = env.DATABASE_U
   return {
     connectionString,
     ssl: sslConfig(connectionString),
-    max: Number.isInteger(max) && max > 0 ? max : 10,
+    max: Number.isInteger(max) && max > 0 ? max : 2,
     connectionTimeoutMillis: 10_000,
-    idleTimeoutMillis: 30_000,
+    idleTimeoutMillis: 10_000,
     keepAlive: true,
   };
 }

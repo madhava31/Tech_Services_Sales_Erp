@@ -35,74 +35,70 @@ router.get('/', async (req, res) => {
 
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
-    const [
-      dueTasks,
-      draftVisits,
-      recentVisits,
-      stats,
-      overdueCount,
-      overdueDeals,
-      stuckDeals,
-      tendersDue,
-      erpOrders,
-    ] = await Promise.all([
-      db.prepare(
-        `SELECT ${TASK_COLUMNS}
-         FROM task t JOIN company c ON c.id = t.company_id JOIN salesperson sp ON sp.id = t.assignee_salesperson_id${TASK_CONTACT_JOIN}
-         WHERE t.status = 'open' AND t.due_date <= ${TODAY_SQL} + 7${taskScope}
-         ORDER BY t.due_date, t.priority DESC, t.id
-         LIMIT 200`
-      ).all(...taskParams),
-      db.prepare(
-        `SELECT v.id, v.visited_at, v.company_id, c.name AS company_name, sp.name AS salesperson_name
-         FROM visit v JOIN company c ON c.id = v.company_id JOIN salesperson sp ON sp.id = v.salesperson_id
-         WHERE v.status = 'draft'${draftScope}
-         ORDER BY v.visited_at DESC LIMIT 20`
-      ).all(...draftParams),
-      db.prepare(
-        `SELECT v.id, v.visited_at, v.outcome, v.company_id, c.name AS company_name, sp.name AS salesperson_name
-         FROM visit v JOIN company c ON c.id = v.company_id JOIN salesperson sp ON sp.id = v.salesperson_id
-         WHERE v.status = 'completed'${recentScope}
-         ORDER BY v.completed_at DESC LIMIT 5`
-      ).all(...recentParams),
-      db.prepare(
-        `SELECT
-           COUNT(*) FILTER (WHERE v.visited_at >= (date_trunc('week', ${TODAY_SQL}::timestamp) AT TIME ZONE 'Asia/Kolkata')) AS visits_this_week,
-           COUNT(DISTINCT v.company_id) FILTER (WHERE v.visited_at >= ((${TODAY_SQL} - 29)::timestamp AT TIME ZONE 'Asia/Kolkata')) AS companies_visited_30d,
-           COUNT(*) FILTER (WHERE v.outcome = 'quotation_requested' AND v.visited_at >= ((${TODAY_SQL} - 29)::timestamp AT TIME ZONE 'Asia/Kolkata')) AS quotation_requests_30d
-         FROM visit v
-         WHERE v.status = 'completed'${statScope}`
-      ).get(...statParams),
-      db.prepare(`SELECT COUNT(*) AS c FROM task t WHERE t.status = 'open' AND t.due_date < ${TODAY_SQL}${overdueScope}`).get(...overdueParams),
-      db.prepare(
-        `SELECT o.id, o.title, o.stage, o.estimated_value, o.expected_close_date, c.name AS company_name, sp.name AS owner_name
-         FROM opportunity o JOIN company c ON c.id = o.company_id JOIN salesperson sp ON sp.id = o.owner_salesperson_id
-         WHERE o.stage NOT IN ('won', 'lost') AND o.expected_close_date < ${TODAY_SQL}${dealScope}
-         ORDER BY o.expected_close_date, o.id LIMIT 50`
-      ).all(...dealParams),
-      db.prepare(
-        `SELECT o.id, o.title, o.stage, o.estimated_value, c.name AS company_name, sp.name AS owner_name,
-                ${DAYS_IN_STAGE_SQL} AS days_in_stage, ${STUCK_AFTER_SQL} AS stuck_after_days
-         FROM opportunity o JOIN company c ON c.id = o.company_id JOIN salesperson sp ON sp.id = o.owner_salesperson_id
-         WHERE ${STUCK_SQL} AND NOT COALESCE(o.expected_close_date < ${TODAY_SQL}, FALSE)${stuckScope}
-         ORDER BY days_in_stage DESC, o.id LIMIT 50`
-      ).all(...stuckParams),
-      db.prepare(
-        `SELECT t.opportunity_id, t.tender_number, t.bid_due_date, (t.bid_due_date - ${TODAY_SQL}) AS days_left, o.title, c.name AS company_name, sp.name AS owner_name
-         FROM tender t JOIN opportunity o ON o.id = t.opportunity_id JOIN company c ON c.id = o.company_id JOIN salesperson sp ON sp.id = o.owner_salesperson_id
-         WHERE o.tender AND o.closed_at IS NULL AND t.bid_status = 'preparing' AND t.bid_due_date <= ${TODAY_SQL} + 7${tenderScope}
-         ORDER BY t.bid_due_date LIMIT 30`
-      ).all(...tenderParams),
-      db.prepare(
-        `SELECT DISTINCT ON (o.id) o.id, o.title, c.name AS company_name, sp.name AS owner_name, eo.number AS order_number, eo.client_po_ref
-         FROM opportunity o
-         JOIN quotation_link q ON q.opportunity_id = o.id
-         JOIN erp_order eo ON eo.erp_quotation_id = q.erp_quotation_id
-         JOIN company c ON c.id = o.company_id JOIN salesperson sp ON sp.id = o.owner_salesperson_id
-         WHERE o.stage NOT IN ('won', 'lost')${orderScope}
-         ORDER BY o.id, eo.id DESC LIMIT 30`
-      ).all(...orderParams),
-    ]);
+    const dueTasks = await db.prepare(
+      `SELECT ${TASK_COLUMNS}
+       FROM task t JOIN company c ON c.id = t.company_id JOIN salesperson sp ON sp.id = t.assignee_salesperson_id${TASK_CONTACT_JOIN}
+       WHERE t.status = 'open' AND t.due_date <= ${TODAY_SQL} + 7${taskScope}
+       ORDER BY t.due_date, t.priority DESC, t.id
+       LIMIT 200`
+    ).all(...taskParams);
+
+    const draftVisits = await db.prepare(
+      `SELECT v.id, v.visited_at, v.company_id, c.name AS company_name, sp.name AS salesperson_name
+       FROM visit v JOIN company c ON c.id = v.company_id JOIN salesperson sp ON sp.id = v.salesperson_id
+       WHERE v.status = 'draft'${draftScope}
+       ORDER BY v.visited_at DESC LIMIT 20`
+    ).all(...draftParams);
+
+    const recentVisits = await db.prepare(
+      `SELECT v.id, v.visited_at, v.outcome, v.company_id, c.name AS company_name, sp.name AS salesperson_name
+       FROM visit v JOIN company c ON c.id = v.company_id JOIN salesperson sp ON sp.id = v.salesperson_id
+       WHERE v.status = 'completed'${recentScope}
+       ORDER BY v.completed_at DESC LIMIT 5`
+    ).all(...recentParams);
+
+    const stats = await db.prepare(
+      `SELECT
+         COUNT(*) FILTER (WHERE v.visited_at >= (date_trunc('week', ${TODAY_SQL}::timestamp) AT TIME ZONE 'Asia/Kolkata')) AS visits_this_week,
+         COUNT(DISTINCT v.company_id) FILTER (WHERE v.visited_at >= ((${TODAY_SQL} - 29)::timestamp AT TIME ZONE 'Asia/Kolkata')) AS companies_visited_30d,
+         COUNT(*) FILTER (WHERE v.outcome = 'quotation_requested' AND v.visited_at >= ((${TODAY_SQL} - 29)::timestamp AT TIME ZONE 'Asia/Kolkata')) AS quotation_requests_30d
+       FROM visit v
+       WHERE v.status = 'completed'${statScope}`
+    ).get(...statParams);
+
+    const overdueCount = await db.prepare(`SELECT COUNT(*) AS c FROM task t WHERE t.status = 'open' AND t.due_date < ${TODAY_SQL}${overdueScope}`).get(...overdueParams);
+
+    const overdueDeals = await db.prepare(
+      `SELECT o.id, o.title, o.stage, o.estimated_value, o.expected_close_date, c.name AS company_name, sp.name AS owner_name
+       FROM opportunity o JOIN company c ON c.id = o.company_id JOIN salesperson sp ON sp.id = o.owner_salesperson_id
+       WHERE o.stage NOT IN ('won', 'lost') AND o.expected_close_date < ${TODAY_SQL}${dealScope}
+       ORDER BY o.expected_close_date, o.id LIMIT 50`
+    ).all(...dealParams);
+
+    const stuckDeals = await db.prepare(
+      `SELECT o.id, o.title, o.stage, o.estimated_value, c.name AS company_name, sp.name AS owner_name,
+              ${DAYS_IN_STAGE_SQL} AS days_in_stage, ${STUCK_AFTER_SQL} AS stuck_after_days
+       FROM opportunity o JOIN company c ON c.id = o.company_id JOIN salesperson sp ON sp.id = o.owner_salesperson_id
+       WHERE ${STUCK_SQL} AND NOT COALESCE(o.expected_close_date < ${TODAY_SQL}, FALSE)${stuckScope}
+       ORDER BY days_in_stage DESC, o.id LIMIT 50`
+    ).all(...stuckParams);
+
+    const tendersDue = await db.prepare(
+      `SELECT t.opportunity_id, t.tender_number, t.bid_due_date, (t.bid_due_date - ${TODAY_SQL}) AS days_left, o.title, c.name AS company_name, sp.name AS owner_name
+       FROM tender t JOIN opportunity o ON o.id = t.opportunity_id JOIN company c ON c.id = o.company_id JOIN salesperson sp ON sp.id = o.owner_salesperson_id
+       WHERE o.tender AND o.closed_at IS NULL AND t.bid_status = 'preparing' AND t.bid_due_date <= ${TODAY_SQL} + 7${tenderScope}
+       ORDER BY t.bid_due_date LIMIT 30`
+    ).all(...tenderParams);
+
+    const erpOrders = await db.prepare(
+      `SELECT DISTINCT ON (o.id) o.id, o.title, c.name AS company_name, sp.name AS owner_name, eo.number AS order_number, eo.client_po_ref
+       FROM opportunity o
+       JOIN quotation_link q ON q.opportunity_id = o.id
+       JOIN erp_order eo ON eo.erp_quotation_id = q.erp_quotation_id
+       JOIN company c ON c.id = o.company_id JOIN salesperson sp ON sp.id = o.owner_salesperson_id
+       WHERE o.stage NOT IN ('won', 'lost')${orderScope}
+       ORDER BY o.id, eo.id DESC LIMIT 30`
+    ).all(...orderParams);
 
     res.json({
       today,
