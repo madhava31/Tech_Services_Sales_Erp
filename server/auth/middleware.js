@@ -64,10 +64,8 @@ export async function requireAuth(req, res, next) {
     req.user = user;
     next();
   } catch (err) {
-    // As Express 4 middleware, an unhandled rejection here would bypass route error handling.
-    // Fails CLOSED: req.user is never set and next() is never called, so a database outage can
-    // never be mistaken for "authenticated".
-    res.status(500).json({ error: 'Unable to verify authentication. Please try again.' });
+    console.error('requireAuth error:', err);
+    res.status(500).json({ error: 'Unable to verify authentication. Please try again.', detail: err.message });
   }
 }
 

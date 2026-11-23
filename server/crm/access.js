@@ -74,5 +74,5 @@ export function sendError(res, err) {
     return res.status(400).json({ error: 'Some of the values are not valid.' });
   }
   console.error(err);
-  return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+  return res.status(500).json({ error: 'Something went wrong. Please try again.', detail: err.message });
 }

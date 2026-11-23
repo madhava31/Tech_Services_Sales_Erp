@@ -33,8 +33,9 @@ router.get('/', async (req, res) => {
     const orderParams = [];
     const orderScope = scopeFilter(req.user, 'o.owner_salesperson_id', orderParams);
 
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+
     const [
-      todayRow,
       dueTasks,
       draftVisits,
       recentVisits,
@@ -45,7 +46,6 @@ router.get('/', async (req, res) => {
       tendersDue,
       erpOrders,
     ] = await Promise.all([
-      db.prepare(`SELECT ${TODAY_SQL}::text AS d`).get(),
       db.prepare(
         `SELECT ${TASK_COLUMNS}
          FROM task t JOIN company c ON c.id = t.company_id JOIN salesperson sp ON sp.id = t.assignee_salesperson_id${TASK_CONTACT_JOIN}
@@ -103,8 +103,6 @@ router.get('/', async (req, res) => {
          ORDER BY o.id, eo.id DESC LIMIT 30`
       ).all(...orderParams),
     ]);
-
-    const today = todayRow.d;
 
     res.json({
       today,
