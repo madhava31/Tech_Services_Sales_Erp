@@ -91,14 +91,35 @@ app.use((req, res, next) => {
 
 app.get('/api/health', async (req, res) => {
   let dbOk = false;
+  let port6543 = null;
+  let poolErr = null;
   try {
     const row = await db.prepare('SELECT 1 as connected').get();
     dbOk = Boolean(row?.connected);
   } catch (err) {
-    // The reason goes to the server log (Vercel → Logs), not to whoever opens this page.
     console.error('Health check: database not reachable:', err.message);
+    poolErr = err.message;
   }
-  res.json({ ok: true, database: dbOk });
+  try {
+    const connStr = process.env.DATABASE_URL || process.env.DATABASE_URL1 || process.env.POSTGRES_URL;
+    if (connStr && connStr.includes(':5432')) {
+      const p6543Url = connStr.replace(':5432', ':6543');
+      const { default: pg } = await import('pg');
+      const { sslConfig } = await import('./db/ssl.js');
+      const testClient = new pg.Client({
+        connectionString: p6543Url,
+        ssl: sslConfig(p6543Url),
+        connectionTimeoutMillis: 4000,
+      });
+      await testClient.connect();
+      await testClient.query('SELECT 1');
+      await testClient.end();
+      port6543 = 'ok';
+    }
+  } catch (err) {
+    port6543 = err.message;
+  }
+  res.json({ ok: true, database: dbOk, poolErr, port6543 });
 });
 
 // Scheduled jobs on Vercel, signed with CRON_SECRET rather than a login.
