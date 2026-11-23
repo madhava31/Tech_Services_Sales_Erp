@@ -4,6 +4,7 @@ import { recordAudit } from '../audit/log.js';
 import { HttpError, canSeeSalesperson, isManaging, requireCrmWriter, resolveOwner, scopeFilter, sendError } from '../crm/access.js';
 import { optionalDate, optionalId, optionalNumber, optionalText, optionalUuid, requiredDate, requiredText } from '../crm/fields.js';
 import { liveCompany } from '../crm/companies.js';
+import { ensureServiceReportSchema } from '../db/serviceReportSchema.js';
 
 // Mounted at /api/service-reports. A field service report is what the engineer found and did at a customer's
 // site: the call dates, the instrument, the problem, the parts needed or replaced, and both signatures. A
@@ -11,6 +12,15 @@ import { liveCompany } from '../crm/companies.js';
 // only a manager can reopen it.
 const router = Router();
 const MAX_SIGNATURE = 60000;
+
+router.use(async (req, res, next) => {
+  try {
+    await ensureServiceReportSchema(db.pool);
+    next();
+  } catch (err) {
+    sendError(res, err);
+  }
+});
 
 const SELECT = `
   SELECT r.*, sp.name AS salesperson_name, o.code AS opportunity_code

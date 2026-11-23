@@ -7,6 +7,7 @@ import cookieParser from 'cookie-parser';
 import db from './db/index.js';
 
 import { requireAuth, requireAdmin } from './auth/middleware.js';
+import { ensureServiceReportSchema } from './db/serviceReportSchema.js';
 import cronRouter from './routes/cron.js';
 import authRouter from './routes/auth.js';
 import serviceReportsRouter from './routes/serviceReports.js';
@@ -240,6 +241,16 @@ app.post('/api/admin/clean-demo', requireAdmin, async (req, res) => {
   } catch (err) {
     console.error(`Failed at step "${step}":`, err);
     res.status(500).json({ error: err.message, step });
+  }
+});
+
+app.post('/api/admin/migrate', requireAdmin, async (req, res) => {
+  try {
+    await ensureServiceReportSchema(db.pool);
+    res.json({ ok: true, message: 'All migrations up to 0023 ensured successfully.' });
+  } catch (err) {
+    console.error('Migration error:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 app.use('/api/companies', companiesRouter);
