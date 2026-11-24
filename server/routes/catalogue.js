@@ -5,6 +5,7 @@ import { isAdminRole } from '../auth/roles.js';
 import { HttpError, sendError } from '../crm/access.js';
 import { optionalId, optionalText, requiredText } from '../crm/fields.js';
 import { erpAdapter } from '../erp/adapter.js';
+import { ensureOtherOemSchema } from '../db/otherOemSchema.js';
 
 // Mounted at /api/products, /api/oems and /api/market-segments. Everyone signed in can read the
 // catalogue. Rows are never deleted: anything in use is deactivated with is_active.
@@ -134,6 +135,10 @@ function nameListRouter({ table, entity, label, inUseSql, ordered = false }) {
 
   router.get('/', async (req, res) => {
     try {
+      if (table === 'oem') {
+        await ensureOtherOemSchema(db.pool);
+      }
+      res.setHeader('Cache-Control', 'private, max-age=120, stale-while-revalidate=600');
       const includeInactive = req.query.include_inactive === '1' && isAdminRole(req.user.role);
       res.json(
         await db

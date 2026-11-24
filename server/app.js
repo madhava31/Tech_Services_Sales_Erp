@@ -7,6 +7,8 @@ import cookieParser from 'cookie-parser';
 import db from './db/index.js';
 
 import { requireAuth, requireAdmin } from './auth/middleware.js';
+import { ensureServiceReportSchema } from './db/serviceReportSchema.js';
+import { ensureOtherOemSchema } from './db/otherOemSchema.js';
 import cronRouter from './routes/cron.js';
 import authRouter from './routes/auth.js';
 import serviceReportsRouter from './routes/serviceReports.js';
@@ -91,14 +93,35 @@ app.use((req, res, next) => {
 
 app.get('/api/health', async (req, res) => {
   let dbOk = false;
+  let port6543 = null;
+  let poolErr = null;
   try {
     const row = await db.prepare('SELECT 1 as connected').get();
     dbOk = Boolean(row?.connected);
   } catch (err) {
-    // The reason goes to the server log (Vercel → Logs), not to whoever opens this page.
     console.error('Health check: database not reachable:', err.message);
+    poolErr = err.message;
   }
-  res.json({ ok: true, database: dbOk });
+  try {
+    const connStr = process.env.DATABASE_URL || process.env.DATABASE_URL1 || process.env.POSTGRES_URL;
+    if (connStr && connStr.includes(':5432')) {
+      const p6543Url = connStr.replace(':5432', ':6543');
+      const { default: pg } = await import('pg');
+      const { sslConfig } = await import('./db/ssl.js');
+      const testClient = new pg.Client({
+        connectionString: p6543Url,
+        ssl: sslConfig(p6543Url),
+        connectionTimeoutMillis: 4000,
+      });
+      await testClient.connect();
+      await testClient.query('SELECT 1');
+      await testClient.end();
+      port6543 = 'ok';
+    }
+  } catch (err) {
+    port6543 = err.message;
+  }
+  res.json({ ok: true, database: dbOk, poolErr, port6543 });
 });
 
 // Scheduled jobs on Vercel, signed with CRON_SECRET rather than a login.
@@ -116,6 +139,122 @@ app.use('/api/admin/audit', requireAdmin, auditRouter);
 app.use('/api/admin/import', requireAdmin, importRouter);
 app.use('/api/admin/erp', requireAdmin, erpSyncRouter);
 app.use('/api/companies', companyDeletionsRouter);
+
+app.post('/api/admin/clean-demo', requireAdmin, async (req, res) => {
+  const pool = db.pool;
+  let step = '';
+  try {
+    step = 'auto_followup';
+    await pool.query(`DELETE FROM auto_followup WHERE task_id IN (SELECT id FROM task WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)'))`);
+
+    step = 'contact_log';
+    await pool.query(`DELETE FROM contact_log WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)')`);
+
+    step = 'installed_instrument';
+    await pool.query(`DELETE FROM installed_instrument WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)')`);
+
+    step = 'reorder_plan';
+    await pool.query(`DELETE FROM reorder_plan WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)')`);
+
+    step = 'tender';
+    await pool.query(`DELETE FROM tender WHERE opportunity_id IN (SELECT id FROM opportunity WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)'))`);
+
+    step = 'quotation_link';
+    await pool.query(`DELETE FROM quotation_link WHERE opportunity_id IN (SELECT id FROM opportunity WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)'))`);
+
+    step = 'opportunity_product';
+    await pool.query(`DELETE FROM opportunity_product WHERE opportunity_id IN (SELECT id FROM opportunity WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)'))`);
+
+    step = 'opportunity_segment';
+    await pool.query(`DELETE FROM opportunity_segment WHERE opportunity_id IN (SELECT id FROM opportunity WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)'))`);
+
+    step = 'opportunity_history';
+    await pool.query(`DELETE FROM opportunity_history WHERE opportunity_id IN (SELECT id FROM opportunity WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)'))`);
+
+    step = 'task';
+    await pool.query(`DELETE FROM task WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)') OR opportunity_id IN (SELECT id FROM opportunity WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)'))`);
+
+    step = 'requirement';
+    await pool.query(`DELETE FROM requirement WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)')`);
+
+    step = 'unlink_visit_opp';
+    await pool.query(`UPDATE visit SET opportunity_id = NULL WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)')`);
+
+    step = 'opportunity';
+    await pool.query(`DELETE FROM opportunity WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)')`);
+
+    step = 'visit';
+    await pool.query(`DELETE FROM visit WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)')`);
+
+    step = 'company_contact';
+    await pool.query(`DELETE FROM company_contact WHERE company_id IN (SELECT id FROM company WHERE category LIKE '%(Demo)')`);
+
+    step = 'unlink_company_parents';
+    await pool.query(`UPDATE company SET parent_company_id = NULL, merged_into_company_id = NULL WHERE category LIKE '%(Demo)'`);
+
+    step = 'company';
+    const cRes = await pool.query(`DELETE FROM company WHERE category LIKE '%(Demo)'`);
+
+    step = 'salesperson';
+    await pool.query(`DELETE FROM salesperson WHERE employee_code IN ('SE-001', 'SE-002', 'SE-003', 'SE-004', 'SE-005') AND id NOT IN (SELECT salesperson_id FROM app_user WHERE salesperson_id IS NOT NULL)`);
+
+    step = 'product';
+    await pool.query(`DELETE FROM product WHERE part_number LIKE 'DEMO-%'`);
+
+    if (req.body?.cleanUserTests) {
+      step = 'cleanUserTests_auto_followup';
+      await pool.query(`DELETE FROM auto_followup`);
+      step = 'cleanUserTests_contact_log';
+      await pool.query(`DELETE FROM contact_log`);
+      step = 'cleanUserTests_installed_instrument';
+      await pool.query(`DELETE FROM installed_instrument`);
+      step = 'cleanUserTests_reorder_plan';
+      await pool.query(`DELETE FROM reorder_plan`);
+      step = 'cleanUserTests_unlink_visit';
+      await pool.query(`UPDATE visit SET opportunity_id = NULL`);
+      step = 'cleanUserTests_task';
+      await pool.query(`DELETE FROM task`);
+      step = 'cleanUserTests_requirement';
+      await pool.query(`DELETE FROM requirement`);
+      step = 'cleanUserTests_quotation_link';
+      await pool.query(`DELETE FROM quotation_link`);
+      step = 'cleanUserTests_tender';
+      await pool.query(`DELETE FROM tender`);
+      step = 'cleanUserTests_opportunity_product';
+      await pool.query(`DELETE FROM opportunity_product`);
+      step = 'cleanUserTests_opportunity_segment';
+      await pool.query(`DELETE FROM opportunity_segment`);
+      step = 'cleanUserTests_opportunity_history';
+      await pool.query(`DELETE FROM opportunity_history`);
+      step = 'cleanUserTests_opportunity';
+      await pool.query(`DELETE FROM opportunity`);
+      step = 'cleanUserTests_visit';
+      await pool.query(`DELETE FROM visit`);
+      step = 'cleanUserTests_company_contact';
+      await pool.query(`DELETE FROM company_contact`);
+      step = 'cleanUserTests_unlink_company';
+      await pool.query(`UPDATE company SET parent_company_id = NULL, merged_into_company_id = NULL`);
+      step = 'cleanUserTests_company';
+      await pool.query(`DELETE FROM company`);
+    }
+
+    res.json({ ok: true, step: 'done', deletedDemoCompanies: cRes.rowCount });
+  } catch (err) {
+    console.error(`Failed at step "${step}":`, err);
+    res.status(500).json({ error: err.message, step });
+  }
+});
+
+app.post('/api/admin/migrate', requireAdmin, async (req, res) => {
+  try {
+    await ensureServiceReportSchema(db.pool);
+    await ensureOtherOemSchema(db.pool);
+    res.json({ ok: true, message: 'All migrations up to 0024 ensured successfully.' });
+  } catch (err) {
+    console.error('Migration error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 app.use('/api/companies', companiesRouter);
 app.use('/api/contacts', contactsRouter);
 app.use('/api/visits', visitsRouter);

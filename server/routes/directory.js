@@ -9,6 +9,7 @@ const router = Router();
 // ?include_inactive=1 (managers, for handover) also lists people who have left.
 router.get('/', async (req, res) => {
   try {
+    res.setHeader('Cache-Control', 'private, max-age=120, stale-while-revalidate=600');
     const params = [];
     const scope = scopeFilter(req.user, 'sp.id', params);
     const includeInactive = req.query.include_inactive === '1' && isManaging(req.user);

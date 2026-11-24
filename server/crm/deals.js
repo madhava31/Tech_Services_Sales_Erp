@@ -25,7 +25,9 @@ function customProductList(body, oemIds) {
     const key = `${oemId}:${name.toLowerCase()}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ oem_id: oemId, name });
+    const make = typeof item?.make === 'string' ? item.make.trim().replace(/\s+/g, ' ').slice(0, 120) : null;
+    const comments = typeof item?.comments === 'string' ? item.comments.trim().slice(0, 2000) : null;
+    out.push({ oem_id: oemId, name, make, comments });
   }
   return out;
 }
@@ -80,7 +82,24 @@ export async function parseDealFields(body, { companyId, keepOemIds = [], keepPr
     if (!p.is_active && !keepProductIds.includes(p.id)) throw new HttpError(400, `${p.name} is no longer active.`);
   }
   for (const oem of oems) {
-    if (!products.some((p) => p.oem_id === oem.id) && !customProducts.some((p) => p.oem_id === oem.id)) throw new HttpError(400, `Choose at least one ${oem.name} product, or remove ${oem.name}.`);
+    if (oem.name.toLowerCase() === 'other') {
+      const items = customProducts.filter((p) => p.oem_id === oem.id);
+      if (items.length === 0) {
+        throw new HttpError(400, 'Make and Product name are required for Other OEM.');
+      }
+      for (const item of items) {
+        if (!item.make || !item.make.trim()) {
+          throw new HttpError(400, 'Make is required for Other OEM.');
+        }
+        if (!item.name || !item.name.trim()) {
+          throw new HttpError(400, 'Product name is required for Other OEM.');
+        }
+      }
+    } else {
+      if (!products.some((p) => p.oem_id === oem.id) && !customProducts.some((p) => p.oem_id === oem.id)) {
+        throw new HttpError(400, `Choose at least one ${oem.name} product, or remove ${oem.name}.`);
+      }
+    }
   }
 
   // Who else is bidding: not known, nobody, or a named competitor.
@@ -142,7 +161,11 @@ export async function replaceDealLinks(opportunityId, { oem_ids: oemIds, product
   for (const id of segmentIds) await db.prepare(`INSERT INTO opportunity_segment (opportunity_id, segment_id) VALUES (?, ?)`).run(opportunityId, id);
   // Products typed in for this opportunity only.
   await db.prepare(`DELETE FROM opportunity_custom_product WHERE opportunity_id = ?`).run(opportunityId);
-  for (const p of customProducts) await db.prepare(`INSERT INTO opportunity_custom_product (opportunity_id, oem_id, name) VALUES (?, ?, ?)`).run(opportunityId, p.oem_id, p.name);
+  for (const p of customProducts) {
+    await db
+      .prepare(`INSERT INTO opportunity_custom_product (opportunity_id, oem_id, name, make, comments) VALUES (?, ?, ?, ?, ?)`)
+      .run(opportunityId, p.oem_id, p.name, p.make ?? null, p.comments ?? null);
+  }
 }
 
 // Inserts a deal, its links and its "created" history row, inside the caller's transaction. The

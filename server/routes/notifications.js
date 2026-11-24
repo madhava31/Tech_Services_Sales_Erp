@@ -8,9 +8,11 @@ const router = Router();
 
 router.get('/', async (req, res) => {
   try {
-    const items = await db.prepare(`SELECT id, title, body, url, read_at, created_at FROM notification WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT 30`).all(req.user.id);
-    const { c } = await db.prepare(`SELECT COUNT(*)::int AS c FROM notification WHERE user_id = ? AND read_at IS NULL`).get(req.user.id);
-    res.json({ items, unread: c, push_public_key: pushPublicKey() });
+    const [items, countRow] = await Promise.all([
+      db.prepare(`SELECT id, title, body, url, read_at, created_at FROM notification WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT 30`).all(req.user.id),
+      db.prepare(`SELECT COUNT(*)::int AS c FROM notification WHERE user_id = ? AND read_at IS NULL`).get(req.user.id),
+    ]);
+    res.json({ items, unread: countRow?.c ?? 0, push_public_key: pushPublicKey() });
   } catch (err) {
     sendError(res, err);
   }

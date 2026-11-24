@@ -22,18 +22,29 @@ interface Trends {
   month: Performance;
 }
 
+let cachedTrends: Trends | null = null;
+let lastTrendsFetchedAt = 0;
+const TRENDS_CACHE_MS = 2 * 60 * 1000;
+
 // The figures behind the small charts. They're extra: if they can't load (no signal), the page works without them.
 function useTrends() {
-  const [trends, setTrends] = useState<Trends | null>(null);
+  const [trends, setTrends] = useState<Trends | null>(cachedTrends);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     let cancelled = false;
+    if (cachedTrends && Date.now() - lastTrendsFetchedAt < TRENDS_CACHE_MS) {
+      setTrends(cachedTrends);
+      return;
+    }
     const ranges = [5, 4, 3, 2, 1, 0].map((n) => ({ from: localDate(-7 * n - 6), to: localDate(-7 * n) }));
     Promise.all([...ranges.map((r) => api.performance(r)), api.performance({ days: 30 })])
       .then((rows) => {
         if (cancelled) return;
         const month = rows[rows.length - 1];
-        setTrends({ weeks: ranges.map((r, i) => ({ ...rows[i], label: formatDate(r.from) })), month });
+        const next = { weeks: ranges.map((r, i) => ({ ...rows[i], label: formatDate(r.from) })), month };
+        cachedTrends = next;
+        lastTrendsFetchedAt = Date.now();
+        setTrends(next);
       })
       .catch(() => !cancelled && setFailed(true));
     return () => {

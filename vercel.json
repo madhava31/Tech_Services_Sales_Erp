@@ -2,6 +2,7 @@
   "installCommand": "npm install && npm --prefix web install",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "regions": ["syd1"],
   "functions": {
     "api/index.js": { "maxDuration": 60 }
   },
