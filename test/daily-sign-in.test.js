@@ -94,3 +94,25 @@ test('only active salespeople are reminded; a login never used counts from when 
   assert.equal((await query(`SELECT COUNT(*)::int AS n FROM notification WHERE user_id = $1 AND kind = 'inactive_reminder'`, [fresh.userId]))[0].n, 1);
   assert.equal((await query(`SELECT COUNT(*)::int AS n FROM notification WHERE user_id = $1 AND kind = 'inactive_reminder'`, [gone.userId]))[0].n, 0);
 });
+
+test('migration 0028 corrects last sign-in from the sign-in record, and takes back a reminder sent on the wrong figure', async () => {
+  const fs = await import('node:fs');
+  const sql = fs.readFileSync(new URL('../server/db/migrations/0028_fix_last_login.sql', import.meta.url), 'utf8');
+  const rep = await signedInSalesperson(server.baseUrl, 'Mended', createClient);
+  const name = (await query(`SELECT username FROM app_user WHERE id = $1`, [rep.userId]))[0].username;
+  // What 0026 left behind: no sign-in time, and a reminder sent because of it.
+  await query(`UPDATE app_user SET last_login_at = NULL, created_at = NOW() - INTERVAL '6 days', inactive_alerted_at = NOW() - INTERVAL '2 hours' WHERE id = $1`, [rep.userId]);
+  await query(`INSERT INTO notification (user_id, kind, for_date, title, body, url) VALUES ($1, 'inactive_reminder', CURRENT_DATE, 'You haven’t signed in for 6 days', 'x', '/')`, [rep.userId]);
+  // The record says they signed in yesterday.
+  await query(`DELETE FROM login_attempt WHERE username = $1`, [name.toLowerCase()]);
+  await query(`INSERT INTO login_attempt (username, ip, succeeded, at) VALUES ($1, '1.1.1.1', TRUE, NOW() - INTERVAL '20 hours')`, [name.toLowerCase()]);
+
+  await query(sql);
+  const [after] = await query(`SELECT last_login_at, inactive_alerted_at FROM app_user WHERE id = $1`, [rep.userId]);
+  assert.ok(after.last_login_at, 'a sign-in time is filled in');
+  assert.ok(Date.now() - new Date(after.last_login_at).getTime() < 21 * 3600 * 1000, 'it is yesterday’s sign-in');
+  assert.equal(after.inactive_alerted_at, null);
+  assert.equal((await query(`SELECT COUNT(*)::int AS n FROM notification WHERE user_id = $1 AND kind = 'inactive_reminder'`, [rep.userId]))[0].n, 0, 'the wrong reminder is taken back');
+  assert.equal((await runInactivityCheck()).reminded >= 0, true);
+  assert.equal((await query(`SELECT COUNT(*)::int AS n FROM notification WHERE user_id = $1 AND kind = 'inactive_reminder'`, [rep.userId]))[0].n, 0, 'and it is not sent again');
+});
