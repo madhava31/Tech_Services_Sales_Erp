@@ -56,9 +56,10 @@ async function validateAssignment({ userId = null, role, salespersonId, managerU
   if (role === 'salesperson' && !salespersonId) return 'A salesperson account must be linked to a salesperson record.';
 
   if (salespersonId) {
-    const person = await db.prepare(`SELECT id, is_active FROM salesperson WHERE id = ?`).get(salespersonId);
+    const person = await db.prepare(`SELECT id, is_active, is_house FROM salesperson WHERE id = ?`).get(salespersonId);
     if (!person) return 'Salesperson record not found.';
     if (!person.is_active) return 'That salesperson record is inactive.';
+    if (person.is_house) return 'Technicon Services is the company owner of admin opportunities and cannot have a login.';
   }
   if (managerUserId) {
     if (managerUserId === userId) return 'A user cannot be their own manager.';

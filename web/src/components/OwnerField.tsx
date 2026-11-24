@@ -8,7 +8,8 @@ import { SelectField } from './ui';
 // so they never see it.
 export function useOwnerChoice() {
   const { user } = useAuth();
-  const chooses = Boolean(user && user.role !== 'salesperson');
+  // An admin's opportunities belong to the company (Technicon Services), so an admin is not asked.
+  const chooses = Boolean(user && user.role !== 'salesperson' && user.role !== 'admin');
   const [ownerId, setOwnerId] = useState<number | ''>(user?.salesperson_id ?? '');
   return { chooses, ownerId, setOwnerId, ready: !chooses || ownerId !== '' };
 }
@@ -27,5 +28,16 @@ export default function OwnerField({ value, onChange }: { value: number | ''; on
         </option>
       ))}
     </SelectField>
+  );
+}
+
+// Shown to an admin instead of the choice: what they open is the company's.
+export function CompanyOwnerNote() {
+  const { user } = useAuth();
+  if (user?.role !== 'admin') return null;
+  return (
+    <p className="ts-box text-[13.5px] m-0">
+      Opened by an admin, so this belongs to <b>Technicon Services</b> (the company), not a salesperson. It can be handed to a salesperson later.
+    </p>
   );
 }

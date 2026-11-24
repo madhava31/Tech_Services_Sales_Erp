@@ -66,6 +66,24 @@ export async function resolveOwner(user, requestedId) {
   return id;
 }
 
+// The company's own owner record, "Technicon Services": it owns the opportunities an admin opens. Made on
+// first use if it is somehow missing.
+export async function houseSalespersonId() {
+  let row = await db.prepare(`SELECT id FROM salesperson WHERE is_house`).get();
+  if (!row) {
+    await db.prepare(`INSERT INTO salesperson (employee_code, name, is_house) VALUES ('TS-HOUSE', 'Technicon Services', TRUE) ON CONFLICT DO NOTHING`).run();
+    row = await db.prepare(`SELECT id FROM salesperson WHERE is_house`).get();
+  }
+  return row.id;
+}
+
+// Whose a new opportunity is. An admin's belongs to the company (Technicon Services), whatever is sent;
+// everyone else follows resolveOwner.
+export async function resolveOpportunityOwner(user, requestedId) {
+  if (user.role === 'admin') return houseSalespersonId();
+  return resolveOwner(user, requestedId);
+}
+
 // Shared error responder for CRM routes: HttpError → its status, Postgres check/foreign-key
 // violations → 400, anything else → 500.
 export function sendError(res, err) {

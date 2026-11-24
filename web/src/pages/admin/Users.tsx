@@ -70,7 +70,7 @@ export default function Users() {
   const [open, setOpen] = useState<{ id: number; panel: Panel } | null>(null);
 
   const managers = users.data.filter((u) => u.is_active && MANAGER_ROLES.includes(u.role));
-  const activeSalespeople = salespeople.data.filter((s) => s.is_active);
+  const activeSalespeople = salespeople.data.filter((s) => s.is_active && !s.is_house);
   const activeCount = users.data.filter((u) => u.is_active).length;
 
   async function run(action: () => Promise<unknown>, success: string) {

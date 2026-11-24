@@ -101,10 +101,10 @@ export default function Salespeople() {
                       <span className={`font-medium ${s.is_active ? '' : 'text-subtle'}`}>{s.name}</span>
                       <Badge>{s.employee_code}</Badge>
                       <Badge tone="brand">TS-{s.id_prefix}</Badge>
-                      {s.is_active ? <Badge tone="ok">Active</Badge> : <Badge tone="muted">Inactive</Badge>}
+                      {s.is_house ? <Badge tone="brand">Company owner</Badge> : s.is_active ? <Badge tone="ok">Active</Badge> : <Badge tone="muted">Inactive</Badge>}
                     </div>
                     <div className="text-xs text-ink-muted mt-1 flex flex-wrap gap-x-4 gap-y-0.5">
-                      <span>{s.username ? `Login: ${s.username}${s.user_is_active ? '' : ' (deactivated)'}` : 'No login yet'}</span>
+                      <span>{s.is_house ? 'Owns the opportunities admins open. No login.' : s.username ? `Login: ${s.username}${s.user_is_active ? '' : ' (deactivated)'}` : 'No login yet'}</span>
                       {s.phone && <a href={`tel:${s.phone}`} className="hover:text-brand">{s.phone}</a>}
                       {s.email && <span>{s.email}</span>}
                       {s.erp_sales_engineer_id && <span>ERP engineer #{s.erp_sales_engineer_id}</span>}
@@ -116,7 +116,7 @@ export default function Salespeople() {
                         Edit
                       </Button>
                     )}
-                    {s.is_active ? (
+                    {s.is_house ? null : s.is_active ? (
                       <Button size="sm" variant="danger" disabled={busy} onClick={() => run(() => api.salespeople.deactivate(s.id), `${s.name} deactivated.`)}>
                         Deactivate
                       </Button>

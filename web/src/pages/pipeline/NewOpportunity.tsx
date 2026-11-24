@@ -4,7 +4,7 @@ import { PlusIcon } from 'lucide-react';
 import { api, CompanySummary } from '../../lib/api';
 import CompanyPicker from '../../components/CompanyPicker';
 import DealFields, { DealDraft, EMPTY_DEAL_DRAFT, dealDraftComplete, draftToInput } from '../../components/DealFields';
-import OwnerField, { useOwnerChoice } from '../../components/OwnerField';
+import OwnerField, { CompanyOwnerNote, useOwnerChoice } from '../../components/OwnerField';
 import { Button, Card, CardHeader, Notice, PageHeader } from '../../components/ui';
 
 // Each opportunity on the form, with a key so React keeps its fields apart when one is removed.
@@ -94,6 +94,7 @@ export default function NewOpportunity() {
               ) : (
                 <>
                   {owner.chooses && <OwnerField value={owner.ownerId} onChange={owner.setOwnerId} />}
+                  <CompanyOwnerNote />
                   {entries.map((entry, i) => (
                     <section key={entry.key} className={i > 0 ? 'pt-4 border-t border-dashed border-line' : ''} aria-label={`Opportunity ${i + 1}`}>
                       <div className="flex items-center justify-between gap-3 mb-3">

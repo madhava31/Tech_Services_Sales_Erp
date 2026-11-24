@@ -8,7 +8,7 @@ import { recordAudit } from '../audit/log.js';
 const router = Router();
 
 const SALESPERSON_SELECT = `
-  SELECT sp.id, sp.employee_code, sp.id_prefix, sp.name, sp.phone, sp.email, sp.is_active, sp.erp_sales_engineer_id,
+  SELECT sp.id, sp.employee_code, sp.id_prefix, sp.name, sp.phone, sp.email, sp.is_active, sp.is_house, sp.erp_sales_engineer_id,
          sp.created_at, sp.updated_at, u.id AS user_id, u.username, u.is_active AS user_is_active
   FROM salesperson sp
   LEFT JOIN app_user u ON u.salesperson_id = sp.id`;
@@ -148,6 +148,7 @@ async function setActive(req, res, active) {
     const id = Number(req.params.id);
     const existing = await loadSalesperson(id);
     if (!existing) return res.status(404).json({ error: 'Salesperson not found' });
+    if (existing.is_house && !active) return res.status(409).json({ error: 'Technicon Services is the company owner of admin opportunities and cannot be deactivated.' });
     if (existing.is_active === active) {
       return res.status(409).json({ error: `This salesperson is already ${active ? 'active' : 'inactive'}` });
     }

@@ -8,7 +8,7 @@ import {
   isManaging,
   requireCrmWriter,
   requireQuotationRole,
-  resolveOwner,
+  resolveOpportunityOwner,
   scopeFilter,
   sendError,
 } from '../crm/access.js';
@@ -321,7 +321,7 @@ router.post('/', requireCrmWriter, async (req, res) => {
     const companyId = optionalId(req.body, 'company_id');
     if (!companyId) throw new HttpError(400, 'company_id is required');
     const company = await assertCompanyAcceptsDeals(companyId);
-    const ownerId = await resolveOwner(req.user, req.body.owner_salesperson_id);
+    const ownerId = await resolveOpportunityOwner(req.user, req.body.owner_salesperson_id);
     // Any stage. Closed as Won or Lost needs what closing needs; Prove and Negotiation need the
     // quotation number, recorded on the opportunity as the quotation already sent.
     const stage = oneOf(req.body, 'stage', STAGE_KEYS, 'create');

@@ -87,6 +87,8 @@ export interface Salesperson {
   phone: string | null;
   email: string | null;
   is_active: boolean;
+  // The company's own owner ("Technicon Services"): owns what an admin opens. No login, never deactivated.
+  is_house?: boolean;
   erp_sales_engineer_id: number | null;
   user_id: number | null;
   username: string | null;
