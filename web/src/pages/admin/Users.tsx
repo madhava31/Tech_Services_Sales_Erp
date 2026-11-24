@@ -3,6 +3,7 @@ import { api, Salesperson, UserAccount, UserAssignment } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useLoad } from '../../lib/useLoad';
 import { MANAGER_ROLES, ROLE_OPTIONS, Role, isAdminRole, roleLabel } from '../../lib/roles';
+import { isQuiet, lastSignIn, quietDays } from '../../lib/signIn';
 import { Badge, Button, Card, CardHeader, EmptyState, Notice, PageHeader, PasswordField, SelectField, TextField } from '../../components/ui';
 
 const EMPTY_ASSIGNMENT: UserAssignment = { role: 'salesperson', salesperson_id: null, manager_user_id: null };
@@ -168,10 +169,12 @@ export default function Users() {
                         <Badge tone={isAdminRole(u.role) ? 'brand' : 'neutral'}>{roleLabel(u.role)}</Badge>
                         {u.is_active ? <Badge tone="ok">Active</Badge> : <Badge tone="muted">Deactivated</Badge>}
                         {u.id === me?.id && <Badge tone="muted">You</Badge>}
+                        {isQuiet(u) && <span className="ts-st ts-tone-warn">Not signed in for {quietDays(u)} days</span>}
                       </div>
                       <div className="text-xs text-ink-muted mt-1 flex flex-wrap gap-x-4 gap-y-0.5">
                         {u.salesperson_name && <span>Salesperson: {u.salesperson_name}</span>}
                         {u.manager_username && <span>Reports to: {u.manager_username}</span>}
+                        {u.is_active && u.role === 'salesperson' && <span>{lastSignIn(u)}</span>}
                         {u.deactivated_at && <span>Deactivated {new Date(u.deactivated_at).toLocaleDateString('en-IN')}</span>}
                       </div>
                     </div>

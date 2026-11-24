@@ -13,7 +13,8 @@ const router = Router();
 
 const USER_SELECT = `
   SELECT u.id, u.username, u.role, u.is_active, u.deactivated_at, u.salesperson_id,
-         u.manager_user_id, u.created_at,
+         u.manager_user_id, u.created_at, u.last_login_at,
+         (EXTRACT(EPOCH FROM NOW() - COALESCE(u.last_login_at, u.created_at)) / 3600)::float AS hours_since_login,
          sp.name AS salesperson_name, sp.employee_code AS salesperson_code,
          m.username AS manager_username
   FROM app_user u

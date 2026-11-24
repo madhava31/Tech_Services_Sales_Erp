@@ -1,4 +1,5 @@
 import webpush from 'web-push';
+import { runInactivityCheck } from './inactivity.js';
 import db from '../db/index.js';
 import { TODAY_SQL } from './fields.js';
 import { createRepeatFollowups } from './repeat.js';
@@ -139,7 +140,12 @@ export async function runReminderJob({ now = new Date() } = {}) {
   if (!isReminderTime(now)) return { skipped: true };
   const digest = await runDailyReminders();
   const report = await runWeeklyReport({ push: pushToUser });
-  return { digest, report: { created: Boolean(report?.created) } };
+  // Salespeople who haven't signed in for three days are reminded (once per quiet spell).
+  const inactivity = await runInactivityCheck().catch((err) => {
+    console.error('Inactivity check failed:', err.message);
+    return { reminded: 0, failed: true };
+  });
+  return { digest, report: { created: Boolean(report?.created) }, inactivity };
 }
 
 function isReminderTime(now = new Date()) {

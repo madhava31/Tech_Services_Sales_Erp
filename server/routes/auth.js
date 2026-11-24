@@ -4,6 +4,7 @@ import db from '../db/index.js';
 import { hashPassword, verifyPassword, isAcceptablePassword, PASSWORD_RULE } from '../auth/password.js';
 import { getSessionUser, toSessionUser } from '../auth/middleware.js';
 import { recordAudit } from '../audit/log.js';
+import { endsDaily, nextCutoff } from '../auth/dailySession.js';
 
 const router = Router();
 const SESSION_DAYS = 30;
@@ -37,17 +38,20 @@ async function recordLoginAttempt(username, ip, succeeded) {
   await db.prepare(`INSERT INTO login_attempt (username, ip, succeeded) VALUES (?, ?, ?)`).run(username, ip, succeeded);
 }
 
-async function createSession(userId, res) {
+async function createSession(userId, res, role) {
   const token = crypto.randomBytes(32).toString('hex');
-  const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000).toISOString();
-  await db.prepare(`INSERT INTO session (token, user_id, expires_at) VALUES (?, ?, ?)`).run(token, userId, expiresAt);
+  // A salesperson's session ends at 11:50 pm India time, so they sign in again every day.
+  const ends = endsDaily(role) ? nextCutoff() : new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
+  await db.prepare(`INSERT INTO session (token, user_id, expires_at) VALUES (?, ?, ?)`).run(token, userId, ends.toISOString());
+  // Remembering when they last signed in is what the "not signed in for 3 days" reminder works from.
+  await db.prepare(`UPDATE app_user SET last_login_at = NOW(), inactive_alerted_at = NULL WHERE id = ?`).run(userId);
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
     // Web app and API are served from one origin, so 'lax' is sufficient and keeps the cookie off
     // cross-site requests.
     secure: isProduction,
     sameSite: 'lax',
-    maxAge: SESSION_DAYS * 24 * 60 * 60 * 1000,
+    maxAge: ends.getTime() - Date.now(),
     path: '/',
   });
 }
@@ -79,7 +83,7 @@ router.post('/setup', async (req, res) => {
       .prepare(`INSERT INTO app_user (username, password_hash, password_salt, role) VALUES (?, ?, ?, 'admin') RETURNING id`)
       .run(username.trim(), hash, salt);
 
-    await createSession(info.lastInsertRowid, res);
+    await createSession(info.lastInsertRowid, res, 'admin');
     res.status(201).json({ user: { id: info.lastInsertRowid, username: username.trim(), role: 'admin', salesperson_id: null } });
   } catch (err) {
     res.status(500).json({ error: 'Unable to complete setup. Please try again.' });
@@ -109,7 +113,7 @@ router.post('/login', async (req, res) => {
     if (!row.is_active) {
       return res.status(403).json({ error: 'This account has been deactivated. Contact your administrator.' });
     }
-    await createSession(row.id, res);
+    await createSession(row.id, res, row.role);
     res.json({ user: toSessionUser(row) });
   } catch (err) {
     res.status(500).json({ error: 'Unable to sign in. Please try again.' });

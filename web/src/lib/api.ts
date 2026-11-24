@@ -70,6 +70,9 @@ export interface UserAccount {
   manager_user_id: number | null;
   manager_username: string | null;
   created_at: string;
+  // Salespeople sign in every day: when they last did, and how long ago (counted from creation if never).
+  last_login_at?: string | null;
+  hours_since_login?: number;
 }
 
 export interface UserAssignment {
