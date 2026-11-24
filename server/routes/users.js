@@ -3,6 +3,7 @@ import db from '../db/index.js';
 import { ROLES, MANAGER_ROLES, isAdminRole } from '../auth/roles.js';
 import { hashPassword, isAcceptablePassword, PASSWORD_RULE } from '../auth/password.js';
 import { recordAudit } from '../audit/log.js';
+import { clearSessionCache } from '../auth/middleware.js';
 
 // Mounted at /api/admin/users behind requireAuth + requireAdmin.
 const router = Router();
@@ -209,6 +210,7 @@ router.post('/:id/deactivate', async (req, res) => {
       });
       return user;
     });
+    clearSessionCache(); // a deactivated person is signed out now, not when the server's one-minute memory of them runs out
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: 'Something went wrong. Please try again.' });
@@ -277,6 +279,7 @@ router.post('/:id/reset-password', async (req, res) => {
         summary: `Reset password for "${target.username}"`,
       });
     });
+    clearSessionCache(); // the server remembers who is signed in for a minute; forget it so the reset applies now
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: 'Something went wrong. Please try again.' });

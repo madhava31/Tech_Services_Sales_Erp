@@ -2,7 +2,7 @@ import { Router } from 'express';
 import crypto from 'node:crypto';
 import db from '../db/index.js';
 import { hashPassword, verifyPassword, isAcceptablePassword, PASSWORD_RULE } from '../auth/password.js';
-import { getSessionUser, toSessionUser, invalidateSession } from '../auth/middleware.js';
+import { clearSessionCache, getSessionUser, toSessionUser, invalidateSession } from '../auth/middleware.js';
 import { recordAudit } from '../audit/log.js';
 import { endsDaily, nextCutoff } from '../auth/dailySession.js';
 
@@ -153,6 +153,7 @@ router.post('/change-password', async (req, res) => {
       await db.prepare(`DELETE FROM session WHERE user_id = ? AND token <> ?`).run(row.id, token);
       await recordAudit({ actorUserId: row.id, action: 'user.password_changed', entityType: 'app_user', entityId: row.id, summary: `"${row.username}" changed their own password` });
     });
+    clearSessionCache();
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: 'Unable to change the password. Please try again.' });

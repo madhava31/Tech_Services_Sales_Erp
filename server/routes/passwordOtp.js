@@ -12,7 +12,7 @@ import { Router } from 'express';
 import db from '../db/index.js';
 import { recordAudit } from '../audit/log.js';
 import { HttpError, sendError } from '../crm/access.js';
-import { getSessionUser } from '../auth/middleware.js';
+import { clearSessionCache, getSessionUser } from '../auth/middleware.js';
 import { hashPassword, verifyPassword, isAcceptablePassword, PASSWORD_RULE } from '../auth/password.js';
 import { checkCode, registeredMobile, sendCode, showPhone } from '../auth/otp.js';
 import { smsConfigured } from '../auth/sms.js';
@@ -33,6 +33,8 @@ async function setPassword(userId, password, { keepToken = null, action, summary
     await db.prepare(`DELETE FROM session WHERE user_id = ? AND token IS DISTINCT FROM ?`).run(userId, keepToken);
     await recordAudit({ actorUserId: userId, action, entityType: 'app_user', entityId: userId, summary });
   });
+  // The server remembers who is signed in for a minute; forget it, so the new password and the ended sessions apply now.
+  clearSessionCache();
 }
 
 // What the set-password screen shows: the registered number (read-only) and whether a code can be sent.

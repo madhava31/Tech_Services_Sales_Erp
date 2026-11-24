@@ -81,7 +81,8 @@ async function appliedMigrations(client) {
 function verifyChecksums(migrations, applied) {
   for (const m of migrations) {
     const row = applied.get(m.version);
-    if (row && row.checksum !== m.checksum) {
+    // A row the app wrote itself while ensuring its own schema (checksum "auto_<version>") counts as applied.
+    if (row && !row.checksum.startsWith('auto_') && row.checksum !== m.checksum) {
       throw new Error(`Migration ${m.file} was modified after being applied (checksum mismatch).`);
     }
   }
