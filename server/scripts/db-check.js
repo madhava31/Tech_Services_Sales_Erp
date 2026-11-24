@@ -65,6 +65,15 @@ async function main() {
     const auditGuard = (await q(`SELECT tgname FROM pg_trigger WHERE tgrelid = 'audit_log'::regclass AND NOT tgisinternal AND tgenabled <> 'D'`)).length;
     check('the audit log is protected from edits and deletes', auditGuard >= 1, `${auditGuard} guards`);
 
+    // Supabase publishes public tables to anyone holding the project's public key unless row security is on.
+    // This app never uses that API, so every table must have row security on and no access for anon / authenticated.
+    const open = await q(`SELECT c.relname AS t FROM pg_class c WHERE c.relnamespace = 'public'::regnamespace AND c.relkind IN ('r', 'p') AND NOT c.relrowsecurity ORDER BY 1`);
+    check('row security is on for every table (so the public API shows nothing)', open.length === 0, open.slice(0, 8).map((r) => r.t).join(', ') + (open.length > 8 ? ` and ${open.length - 8} more` : ''));
+    const granted = await q(
+      `SELECT DISTINCT table_name AS t, grantee FROM information_schema.role_table_grants WHERE table_schema = 'public' AND grantee IN ('anon', 'authenticated') ORDER BY 1`
+    );
+    check('the public roles (anon, authenticated) have no access to any table', granted.length === 0, granted.slice(0, 6).map((g) => `${g.t}→${g.grantee}`).join(', ') + (granted.length > 6 ? ` and ${granted.length - 6} more` : ''));
+
     // Data against the app's own rules.
     const rules = [
       ['every opportunity has its ID, in the form TS-<letters>-<4 digits>', `SELECT COUNT(*)::int AS n FROM opportunity WHERE code IS NULL OR code !~ '^TS-[A-Z0-9]+-[0-9]{4,}$'`],

@@ -30,3 +30,16 @@ test('it reports data that breaks the rules of the app, and exits with an error'
   assert.match(res.stdout, /FAIL {2}every company state is on the Indian list/);
   assert.match(res.stdout, /1 FAILED/);
 });
+
+test('it flags a table left open to the public API, and the migration closes every table', async () => {
+  await resetTestDatabase();
+  const closed = await query(`SELECT COUNT(*)::int AS n FROM pg_class WHERE relnamespace = 'public'::regnamespace AND relkind IN ('r', 'p') AND NOT relrowsecurity`);
+  assert.equal(closed[0].n, 0, 'every table has row security on after the migrations');
+
+  await query(`ALTER TABLE company DISABLE ROW LEVEL SECURITY`);
+  const res = run();
+  assert.equal(res.status, 1, res.stdout + res.stderr);
+  assert.match(res.stdout, /FAIL {2}row security is on for every table/);
+  assert.match(res.stdout, /company/);
+  await query(`ALTER TABLE company ENABLE ROW LEVEL SECURITY`);
+});
