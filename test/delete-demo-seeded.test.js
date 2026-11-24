@@ -29,7 +29,7 @@ test('demo data from the seed is removed completely, and a preview removes nothi
   for (const table of ['company', 'company_contact', 'opportunity', 'opportunity_oem', 'opportunity_product', 'opportunity_history', 'visit', 'task', 'requirement', 'quotation_link', 'tender', 'installed_instrument', 'reorder_plan']) {
     assert.equal(await count(table), 0, `${table} is empty`);
   }
-  assert.equal(await count('salesperson'), 0, 'the demo salespeople are gone');
+  assert.equal(await count('salesperson', 'NOT is_house'), 0, 'the demo salespeople are gone (the company owner stays)');
   assert.equal(await count('product', `part_number LIKE 'DEMO-%'`), 0, 'and the demo products');
   assert.equal(await count('app_user'), 1, 'the real login stays');
 });

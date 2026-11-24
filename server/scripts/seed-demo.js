@@ -192,7 +192,7 @@ async function main() {
     const people = await q(
       `SELECT sp.id, sp.name, u.id AS user_id FROM salesperson sp
        LEFT JOIN app_user u ON u.salesperson_id = sp.id AND u.is_active
-       WHERE sp.is_active ORDER BY sp.id`
+       WHERE sp.is_active AND NOT sp.is_house ORDER BY sp.id`
     );
     // Records are "created by" the salesperson's own login when they have one.
     const creatorOf = (sp) => sp.user_id ?? admin.id;
