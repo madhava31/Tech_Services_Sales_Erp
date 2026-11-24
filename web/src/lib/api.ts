@@ -73,6 +73,8 @@ export interface UserAccount {
   // Salespeople sign in every day: when they last did, and how long ago (counted from creation if never).
   last_login_at?: string | null;
   hours_since_login?: number;
+  // A session is still open, so they are signed in now (the last sign-in may be older).
+  signed_in_now?: boolean;
 }
 
 export interface UserAssignment {

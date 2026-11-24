@@ -14,6 +14,8 @@ export async function runInactivityCheck() {
               (EXTRACT(EPOCH FROM NOW() - COALESCE(u.last_login_at, u.created_at)) / 3600)::float AS hours
          FROM app_user u LEFT JOIN salesperson sp ON sp.id = u.salesperson_id
         WHERE u.is_active AND u.role = 'salesperson' AND u.inactive_alerted_at IS NULL
+          -- Someone whose session is still open is signed in (an older session from before the daily rule), however long ago it began.
+          AND NOT EXISTS (SELECT 1 FROM session s WHERE s.user_id = u.id AND s.expires_at > NOW())
           AND COALESCE(u.last_login_at, u.created_at) < NOW() - make_interval(hours => ?)
         ORDER BY u.id`
     )
