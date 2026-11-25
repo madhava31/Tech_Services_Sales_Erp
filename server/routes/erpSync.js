@@ -4,6 +4,7 @@ import { recordAudit } from '../audit/log.js';
 import { HttpError, sendError } from '../crm/access.js';
 import { optionalId } from '../crm/fields.js';
 import { normalizeCompanyName } from '../crm/normalize.js';
+import { canonicalState } from '../crm/states.js';
 import { erpProblem } from '../erp/adapter.js';
 import { runErpSync } from '../erp/sync.js';
 import { processQuotationRequests } from '../erp/quotationRequest.js';
@@ -96,7 +97,7 @@ router.post('/customers/:id/add', async (req, res) => {
           `INSERT INTO company (name, normalized_name, state, address, phone, email, contact_person, gstin, erp_company_id, approval_status, approved_by, approved_at, created_by)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved', ?, NOW(), ?) RETURNING id`
         )
-        .run(customer.name, normalizeCompanyName(customer.name), customer.state, customer.address, customer.phone, customer.email, customer.contact_person, customer.gstin, customer.id, req.user.id, req.user.id);
+        .run(customer.name, normalizeCompanyName(customer.name), canonicalState(customer.state), customer.address, customer.phone, customer.email, customer.contact_person, customer.gstin, customer.id, req.user.id, req.user.id);
       await recordAudit({ actorUserId: req.user.id, action: 'company.created', entityType: 'company', entityId: info.lastInsertRowid, summary: `Added company ${customer.name} from the ERP` });
       return info.lastInsertRowid;
     });

@@ -86,13 +86,15 @@ async function main() {
       ['every salesperson has ID letters, and they are unique', `SELECT (SELECT COUNT(*) FROM salesperson WHERE id_prefix IS NULL) + (SELECT COUNT(*) FROM (SELECT id_prefix FROM salesperson GROUP BY id_prefix HAVING COUNT(*) > 1) d) AS n`],
       ['no salesperson is behind the opportunity numbers already used', `SELECT COUNT(*)::int AS n FROM salesperson s WHERE s.next_opportunity_no <= COALESCE((SELECT MAX(split_part(o.code, '-', 3)::int) FROM opportunity o WHERE o.owner_salesperson_id = s.id AND o.code LIKE 'TS-' || s.id_prefix || '-%'), 0)`],
       ['no two live contacts share a phone number', `SELECT COUNT(*)::int AS n FROM (SELECT right(regexp_replace(phone, '[^0-9]', '', 'g'), 10) AS k FROM company_contact WHERE archived_at IS NULL AND phone IS NOT NULL GROUP BY 1 HAVING COUNT(*) > 1) d`],
-      ['every company state is on the Indian list', `SELECT COUNT(*)::int AS n FROM company WHERE state IS NOT NULL AND archived_at IS NULL AND state NOT IN (${INDIAN_STATES_SQL()})`],
+      ['every company state is on the Indian list', `SELECT COUNT(*)::int AS n FROM company WHERE state IS NOT NULL AND archived_at IS NULL AND state NOT IN (${INDIAN_STATES_SQL()})`, `SELECT name || ' (' || state || ')' AS label FROM company WHERE state IS NOT NULL AND archived_at IS NULL AND state NOT IN (${INDIAN_STATES_SQL()}) ORDER BY id LIMIT 8`],
       ['every user has a valid role', `SELECT COUNT(*)::int AS n FROM app_user WHERE role IS NULL OR btrim(role) = ''`],
     ];
-    for (const [name, sql] of rules) {
+    for (const [name, sql, detailSql] of rules) {
       try {
         const n = (await one(sql)).n;
-        check(name, Number(n) === 0, Number(n) ? `${n} found` : '');
+        let detail = Number(n) ? `${n} found` : '';
+        if (Number(n) && detailSql) detail += ': ' + (await q(detailSql)).map((r) => r.label).join('; ');
+        check(name, Number(n) === 0, detail);
       } catch (err) {
         check(name, false, `could not run: ${err.message}`);
       }
