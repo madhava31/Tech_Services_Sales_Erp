@@ -27,6 +27,9 @@ import {
 } from '../crm/pipeline.js';
 import { assertCompanyAcceptsDeals, insertOpportunity, parseDealFields, replaceDealLinks, resolveDealContact } from '../crm/deals.js';
 import { auditHandover, transferDeals } from '../crm/handover.js';
+import { closeQuotationRequest, notifyQuotationReady, processQuotationRequests, requestStatus } from '../erp/quotationRequest.js';
+import { erpProblem } from '../erp/adapter.js';
+import { runErpSync } from '../erp/sync.js';
 import { DAYS_IN_STAGE_SQL, STUCK_AFTER_SQL, STUCK_SQL } from '../crm/stuck.js';
 import { ensureOtherOemSchema } from '../db/otherOemSchema.js';
 
@@ -312,7 +315,7 @@ router.get('/:id', async (req, res) => {
          WHERE q.opportunity_id = ? ORDER BY eo.order_date DESC NULLS LAST, eo.id DESC`
       )
       .all(opp.id);
-    res.json({ ...opp, tender_details: tenderDetails ?? null, contact_log: contactLog, erp_orders: erpOrders, history, quotations, requirements, tasks, visits });
+    res.json({ ...opp, tender_details: tenderDetails ?? null, contact_log: contactLog, erp_orders: erpOrders, history, quotations, requirements, tasks, visits, quotation_request: await requestStatus(opp.id) });
   } catch (err) {
     sendError(res, err);
   }
@@ -347,6 +350,7 @@ router.post('/', requireCrmWriter, async (req, res) => {
       }
       return newId;
     });
+    await processQuotationRequests();
     res.status(201).json(await loadVisibleOpportunity(req.user, id));
   } catch (err) {
     if (phoneConflict(res, err)) return;
@@ -433,6 +437,7 @@ router.post('/bulk', requireCrmWriter, async (req, res) => {
       }
       return { updated, skipped };
     });
+    await processQuotationRequests();
     res.json(result);
   } catch (err) {
     sendError(res, err);
@@ -568,6 +573,7 @@ router.post('/:id/stage', requireCrmWriter, async (req, res) => {
         after: { stage, probability, won_value: wonValue, lost_reason: lostReason, close_reason: closeReason },
       });
     });
+    await processQuotationRequests();
     res.json(await loadVisibleOpportunity(req.user, opp.id));
   } catch (err) {
     sendError(res, err);
@@ -588,6 +594,35 @@ router.post('/:id/owner', requireCrmWriter, async (req, res) => {
       await auditHandover({ userId: req.user.id, from: moved.from, to: moved.to, dealIds: moved.dealIds, taskIds: moved.taskIds, reason, single: true });
     });
     res.json(await loadVisibleOpportunity(req.user, opp.id));
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+// "Check for the quotation": sends a request the ERP has not taken yet, and copies what the ERP has now, so a
+// quotation the office has just made shows up without waiting for the daily sync. At most once a minute.
+router.post('/:id/refresh-quotation', async (req, res) => {
+  try {
+    const opp = await loadVisibleOpportunity(req.user, Number(req.params.id));
+    const requests = await processQuotationRequests();
+    let synced = false;
+    let message = null;
+    if (erpProblem()) {
+      message = 'The link to the ERP is not set up yet.';
+    } else {
+      const last = await db.prepare(`SELECT (NOW() - started_at) < INTERVAL '60 seconds' AS recent FROM erp_sync_run ORDER BY id DESC LIMIT 1`).get();
+      if (last?.recent) {
+        message = 'The ERP was checked a moment ago. Try again in a minute.';
+      } else {
+        try {
+          await runErpSync({ trigger: 'manual' });
+          synced = true;
+        } catch (err) {
+          message = err instanceof HttpError ? err.message : 'The ERP could not be reached.';
+        }
+      }
+    }
+    res.json({ synced, message, requests, opportunity_id: opp.id });
   } catch (err) {
     sendError(res, err);
   }
@@ -633,6 +668,8 @@ router.delete('/:id', requireCrmWriter, async (req, res) => {
            DELETE FROM task WHERE opportunity_id = ${n};
            DELETE FROM tender WHERE opportunity_id = ${n};
            DELETE FROM quotation_link WHERE opportunity_id = ${n};
+           DELETE FROM quotation_request WHERE opportunity_id = ${n};
+           UPDATE service_report SET opportunity_id = NULL WHERE opportunity_id = ${n};
            DELETE FROM opportunity_product WHERE opportunity_id = ${n};
            DELETE FROM opportunity_custom_product WHERE opportunity_id = ${n};
            DELETE FROM opportunity_oem WHERE opportunity_id = ${n};
@@ -709,8 +746,11 @@ router.post('/:id/quotations', requireQuotationRole, async (req, res) => {
         summary: `Recorded quotation ${fields.quotation_number}${fields.amount != null ? ` for ₹${fields.amount.toLocaleString('en-IN')}` : ''} on "${opp.title}"`,
         after: fields,
       });
+      // The request for this quotation is finished.
+      await closeQuotationRequest(opp.id);
       return info.lastInsertRowid;
     });
+    await notifyQuotationReady(opp, req.user.id);
     res.status(201).json(await db.prepare(`SELECT * FROM quotation_link WHERE id = ?`).get(linkId));
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: 'That quotation is already recorded.' });

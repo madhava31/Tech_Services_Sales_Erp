@@ -297,6 +297,8 @@ export const api = {
     get: (id: number) => request<OpportunityDetail>(`/opportunities/${id}`),
     create: (data: DealInput & { company_id: number; stage?: Stage; owner_salesperson_id?: number | null }) => post<Opportunity>('/opportunities', data),
     update: (id: number, data: Partial<DealInput>) => put<Opportunity>(`/opportunities/${id}`, data),
+    // Sends a request the ERP has not taken yet and copies what the ERP has now (at most once a minute).
+    refreshQuotation: (id: number) => post<{ synced: boolean; message: string | null }>(`/opportunities/${id}/refresh-quotation`, {}),
     moveStage: (
       id: number,
       data: { stage: Stage; note?: string; won_value?: number; lost_reason?: LostReason; close_reason?: string }
@@ -855,7 +857,16 @@ export interface QuotationInput {
   erp_quotation_id?: number;
 }
 
+// The request for a quotation made when an opportunity entered Develop.
+export interface QuotationRequestStatus {
+  requested_at: string;
+  state: 'waiting' | 'sent' | 'done';
+  sent_at: string | null;
+  note: string | null;
+}
+
 export interface OpportunityDetail extends Opportunity {
+  quotation_request?: QuotationRequestStatus | null;
   erp_orders: { id: number; number: string; order_date: string | null; client_po_ref: string | null; status: string | null; quotation_number: string }[];
   contact_log: ContactLogEntry[];
   tender_details: TenderDetails | null;

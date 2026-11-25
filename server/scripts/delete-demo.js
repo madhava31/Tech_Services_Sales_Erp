@@ -70,6 +70,18 @@ async function main() {
       ) RETURNING id
     `);
 
+    // Requests for a quotation, and service reports that point at those opportunities.
+    await q(`
+      DELETE FROM quotation_request WHERE opportunity_id IN (
+        SELECT id FROM opportunity WHERE company_id IN (SELECT id FROM doomed_company)
+      )
+    `);
+    await q(`
+      UPDATE service_report SET opportunity_id = NULL WHERE opportunity_id IN (
+        SELECT id FROM opportunity WHERE company_id IN (SELECT id FROM doomed_company)
+      )
+    `);
+
     // 4. Opportunity products, segments, and history
     const delOppProd = await q(`
       DELETE FROM opportunity_product WHERE opportunity_id IN (

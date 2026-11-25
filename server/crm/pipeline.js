@@ -43,6 +43,12 @@ export async function recordHistory({ opportunityId, changeType, from = null, to
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     )
     .run(opportunityId, changeType, field, from, to, note, userId);
+  // Entering Develop is asking for a quotation. It is written down here, in the same transaction as the move,
+  // and told to the office and sent to the ERP afterwards (see erp/quotationRequest.js).
+  if (to === 'develop' && (changeType === 'created' || changeType === 'stage')) {
+    const { queueQuotationRequest } = await import('../erp/quotationRequest.js');
+    await queueQuotationRequest({ opportunityId, userId });
+  }
 }
 
 // Moves an open deal forward to `stage` if it is currently earlier in the pipeline — used when

@@ -12,6 +12,7 @@ import {
 import { insertRequirement, parseRequirementList } from '../crm/requirements.js';
 import { insertTask, taskFields } from '../crm/tasks.js';
 import { advanceIfBehind, isOpen } from '../crm/pipeline.js';
+import { processQuotationRequests } from '../erp/quotationRequest.js';
 import { liveCompany } from '../crm/companies.js';
 import { contactFields, insertContact, resolveContactByPhone } from '../crm/contacts.js';
 import { assertCompanyAcceptsDeals, insertOpportunity, parseDealFields } from '../crm/deals.js';
@@ -226,6 +227,7 @@ router.post('/:id/complete', requireCrmWriter, async (req, res) => {
     const updated = await loadVisibleVisit(req.user, visit.id);
     const savedRequirements = await db.prepare(`SELECT * FROM requirement WHERE visit_id = ? ORDER BY id`).all(visit.id);
     const tasks = await db.prepare(`SELECT * FROM task WHERE visit_id = ? ORDER BY id`).all(visit.id);
+    await processQuotationRequests();
     res.json({ ...updated, requirements: savedRequirements, tasks });
   } catch (err) {
     sendError(res, err);

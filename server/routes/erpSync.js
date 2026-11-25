@@ -6,6 +6,7 @@ import { optionalId } from '../crm/fields.js';
 import { normalizeCompanyName } from '../crm/normalize.js';
 import { erpProblem } from '../erp/adapter.js';
 import { runErpSync } from '../erp/sync.js';
+import { processQuotationRequests } from '../erp/quotationRequest.js';
 
 // Mounted at /api/admin/erp behind requireAuth + requireAdmin: the state of the ERP connection, and the
 // customers the sync couldn't match by itself.
@@ -31,7 +32,9 @@ router.get('/', async (req, res) => {
 
 router.post('/run', async (req, res) => {
   try {
-    res.json(await runErpSync({ trigger: 'manual' }));
+    const result = await runErpSync({ trigger: 'manual' });
+    await processQuotationRequests({ limit: 20 }); // requests the ERP could not take earlier
+    res.json(result);
   } catch (err) {
     sendError(res, err);
   }

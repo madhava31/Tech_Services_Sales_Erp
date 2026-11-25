@@ -72,3 +72,37 @@ export function erpProblem() {
 export function erpAdapter() {
   return erpProblem() ? localAdapter : liveAdapter;
 }
+
+// Sending a quotation request to the ERP is the one thing this app writes there. It uses its own key
+// (ERP_API_WRITE_KEY), separate from the read-only one, so the read key can never write. Without it nothing
+// is sent and the request waits.
+export function erpWriteProblem() {
+  const { problem } = erpConnection();
+  if (problem) return problem;
+  const key = process.env.ERP_API_WRITE_KEY;
+  if (!key || key.length < 32) return 'Sending requests to the ERP is not set up yet: the server needs ERP_API_WRITE_KEY (at least 32 characters).';
+  return null;
+}
+
+// Returns the ERP's own id for the request. Errors say what happened but never repeat a key or a response.
+export async function sendQuotationRequestToErp(payload) {
+  const problem = erpWriteProblem();
+  if (problem) throw new Error(problem);
+  const { base } = erpConnection();
+  let res;
+  try {
+    res = await fetch(`${base}/quotation-requests`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${process.env.ERP_API_WRITE_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(8000),
+    });
+  } catch (err) {
+    throw new Error(err.name === 'TimeoutError' ? 'The ERP took too long to answer.' : 'Could not reach the ERP.');
+  }
+  if (res.status === 401) throw new Error('The ERP refused the key. Check ERP_API_WRITE_KEY.');
+  if (res.status === 404) throw new Error('The ERP cannot take requests yet, or its write key is not set.');
+  if (!res.ok) throw new Error(`The ERP answered with an error (${res.status}).`);
+  const data = await res.json().catch(() => null);
+  return { id: Number.isInteger(data?.id) ? data.id : null };
+}

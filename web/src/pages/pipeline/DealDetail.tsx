@@ -239,6 +239,48 @@ export default function DealDetail() {
         </div>
       )}
 
+      {d.quotation_request && (
+        <div className="ts-box flex flex-wrap items-center gap-x-4 gap-y-2 text-[13.5px]">
+          <div className="flex-1 min-w-[220px]">
+            <b>
+              {d.quotation_request.state === 'done'
+                ? 'Quotation ready.'
+                : d.quotation_request.state === 'sent'
+                  ? 'Quotation requested. The office is preparing it in the ERP.'
+                  : 'Quotation requested. Waiting to reach the ERP office.'}
+            </b>{' '}
+            <span className="ts-muted">
+              Asked {formatDateTime(d.quotation_request.requested_at)}
+              {d.quotation_request.sent_at ? `, sent ${formatDateTime(d.quotation_request.sent_at)}` : ''}.
+            </span>
+            {d.quotation_request.note && <div className="ts-muted mt-1">{d.quotation_request.note}</div>}
+          </div>
+          {d.quotation_request.state !== 'done' && writer && (
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                setError('');
+                setNotice('');
+                try {
+                  const r = await api.opportunities.refreshQuotation(d.id);
+                  setNotice(r.message ?? 'Checked the ERP for the quotation.');
+                  await deal.reload();
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : 'Could not check the ERP.');
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              Check for the quotation
+            </Button>
+          )}
+        </div>
+      )}
+
       {canDelete && (
         <div>
           <Button size="sm" variant="ghost" disabled={busy} onClick={() => void deleteDeal()}>

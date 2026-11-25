@@ -1,5 +1,6 @@
 import webpush from 'web-push';
 import { runInactivityCheck } from './inactivity.js';
+import { processQuotationRequests } from '../erp/quotationRequest.js';
 import db from '../db/index.js';
 import { TODAY_SQL } from './fields.js';
 import { createRepeatFollowups } from './repeat.js';
@@ -145,7 +146,9 @@ export async function runReminderJob({ now = new Date() } = {}) {
     console.error('Inactivity check failed:', err.message);
     return { reminded: 0, failed: true };
   });
-  return { digest, report: { created: Boolean(report?.created) }, inactivity };
+  // Quotation requests the ERP could not take earlier are sent again.
+  const quotationRequests = await processQuotationRequests({ limit: 20 });
+  return { digest, report: { created: Boolean(report?.created) }, inactivity, quotationRequests };
 }
 
 function isReminderTime(now = new Date()) {

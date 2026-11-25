@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { runReminderJob } from '../crm/reminders.js';
 import { runErpSync } from '../erp/sync.js';
 import { erpProblem } from '../erp/adapter.js';
+import { processQuotationRequests } from '../erp/quotationRequest.js';
 
 // Mounted at /api/cron, before sign-in. Vercel has no always-on process, so the reminders and the ERP
 // sync that a long-running server starts on a timer (server/index.js) are started here instead, by
@@ -36,6 +37,7 @@ router.get('/erp-sync', async (req, res) => {
   try {
     if (erpProblem()) return res.json({ skipped: true });
     const { id, status, counts } = await runErpSync({ trigger: 'schedule' });
+    await processQuotationRequests({ limit: 20 });
     res.json({ id, status, counts });
   } catch (err) {
     console.error('Cron ERP sync failed:', err.message);
