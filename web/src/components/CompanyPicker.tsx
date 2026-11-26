@@ -168,7 +168,7 @@ function NewCompanyForm({
       )}
       <div className="ts-fgrid ts-g2 !mt-0">
         <TextField label="Company name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required autoFocus />
-        <SelectField label="Category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+        <SelectField label="Category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} required>
           <option value="">Select…</option>
           {categories.map((c) => (
             <option key={c.id} value={c.name}>
@@ -176,8 +176,8 @@ function NewCompanyForm({
             </option>
           ))}
         </SelectField>
-        <TextField label="City" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
-        <SelectField label="State" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })}>
+        <TextField label="City" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} required />
+        <SelectField label="State" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} required>
           <option value="">Select…</option>
           {(form.state && !INDIAN_STATES.includes(form.state) ? [form.state, ...INDIAN_STATES] : INDIAN_STATES).map((s) => (
             <option key={s} value={s}>
@@ -185,13 +185,13 @@ function NewCompanyForm({
             </option>
           ))}
         </SelectField>
-        <TextField label="Address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-        <TextField label="Pin code" inputMode="numeric" maxLength={6} value={form.pincode} onChange={(e) => setForm({ ...form, pincode: e.target.value.replace(/\D/g, '') })} />
-        <TextField label="Contact person" hint="Saved as a contact, so it can be chosen on opportunities." value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} />
-        <TextField label="Designation" value={contact.designation} onChange={(e) => setContact({ ...contact, designation: e.target.value })} />
-        <TextField label="Department" value={contact.department} onChange={(e) => setContact({ ...contact, department: e.target.value })} />
-        <PhoneField label="Company phone" value={form.phone} onChange={(phone) => setForm({ ...form, phone })} />
-        <TextField label="Company email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+        <TextField label="Address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} required />
+        <TextField label="Pin code" inputMode="numeric" maxLength={6} minLength={6} value={form.pincode} onChange={(e) => setForm({ ...form, pincode: e.target.value.replace(/\D/g, '') })} required />
+        <TextField label="Contact person" hint="Saved as a contact, so it can be chosen on opportunities." value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} required />
+        <TextField label="Designation" value={contact.designation} onChange={(e) => setContact({ ...contact, designation: e.target.value })} required />
+        <TextField label="Department" value={contact.department} onChange={(e) => setContact({ ...contact, department: e.target.value })} required />
+        <PhoneField label="Company phone" value={form.phone} onChange={(phone) => setForm({ ...form, phone })} required />
+        <TextField label="Company email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
       </div>
 
       {duplicates.length > 0 && (
