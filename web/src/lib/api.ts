@@ -882,6 +882,8 @@ export interface Performance {
   to: string;
   visits: number;
   companies_visited: number;
+  // Every opportunity the person owns now, open or closed.
+  total_deals: number;
   new_prospects: number;
   deals_opened: number;
   quotation_requests: number;

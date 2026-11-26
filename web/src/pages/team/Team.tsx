@@ -88,7 +88,7 @@ export default function Team() {
         <div className="ts-grid grid-cols-2 min-[1101px]:grid-cols-6">
           <Tile i={0} label="Won" value={formatMoney(t.won_value, { compact: true })} hint={`${t.deals_won} opportunities · ${t.deals_lost} lost`} tone="ok" />
           <Tile i={1} label="Pipeline" value={formatMoney(t.pipeline_value, { compact: true })} hint={`${t.open_deals} open · weighted ${formatMoney(t.weighted_pipeline, { compact: true })}`} />
-          <Tile i={2} label="Opportunities" value={t.visits} hint={`${t.companies_visited} companies · ${t.new_prospects} new`} />
+          <Tile i={2} label="Opportunities" value={t.total_deals} hint={`${t.open_deals} open · ${t.deals_opened} new · ${t.visits} visits`} />
           <Tile i={3} label="Overdue opportunities" value={t.overdue_deals} tone={t.overdue_deals ? 'danger' : undefined} hint="Past expected closing date" />
           <Tile i={4} label="Stuck opportunities" value={t.stuck_deals} tone={t.stuck_deals ? 'warn' : undefined} hint="Too long in one stage" />
           <Tile i={5} label="Overdue follow-ups" value={t.overdue_follow_ups} tone={t.overdue_follow_ups ? 'danger' : undefined} hint="Right now" />
@@ -108,7 +108,7 @@ export default function Team() {
                 </div>
                 <div className="grid grid-cols-3 gap-2 mt-2 text-xs text-ink-muted">
                   <span>
-                    <b className="text-ink">{p.metrics.visits}</b> {p.metrics.visits === 1 ? 'opportunity' : 'opportunities'}
+                    <b className="text-ink">{p.metrics.total_deals}</b> {p.metrics.total_deals === 1 ? 'opportunity' : 'opportunities'}
                   </span>
                   <span>
                     <b className="text-ink">{p.metrics.deals_won}</b> won · {formatMoney(p.metrics.won_value, { compact: true })}
@@ -157,7 +157,7 @@ export default function Team() {
                     <td className="font-medium">
                       {p.name} {!p.is_active && <Badge tone="muted">Left</Badge>}
                     </td>
-                    <td className="ts-r">{p.metrics.visits}</td>
+                    <td className="ts-r">{p.metrics.total_deals}</td>
                     <td className="ts-r">{p.metrics.open_deals}</td>
                     <td className="ts-r">{formatMoney(p.metrics.pipeline_value, { compact: true })}</td>
                     <td className="ts-r">{formatMoney(p.metrics.weighted_pipeline, { compact: true })}</td>
@@ -175,7 +175,7 @@ export default function Team() {
                 <tfoot>
                   <tr className="font-medium">
                     <td>Team</td>
-                    <td className="ts-r">{t.visits}</td>
+                    <td className="ts-r">{t.total_deals}</td>
                     <td className="ts-r">{t.open_deals}</td>
                     <td className="ts-r">{formatMoney(t.pipeline_value, { compact: true })}</td>
                     <td className="ts-r">{formatMoney(t.weighted_pipeline, { compact: true })}</td>

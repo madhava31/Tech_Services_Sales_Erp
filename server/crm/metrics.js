@@ -54,6 +54,7 @@ export async function computeMetrics({ salespersonIds = null, from, to }) {
         WHERE ${STUCK_SQL}${scope('o.owner_salesperson_id')}) AS stuck_deals,
       (SELECT COUNT(*) FROM opportunity o
         WHERE o.stage NOT IN ('won', 'lost')${scope('o.owner_salesperson_id')}) AS open_deals,
+      (SELECT COUNT(*) FROM opportunity o WHERE TRUE${scope('o.owner_salesperson_id')}) AS total_deals,
       (SELECT COALESCE(SUM(o.estimated_value), 0) FROM opportunity o
         WHERE o.stage NOT IN ('won', 'lost')${scope('o.owner_salesperson_id')}) AS pipeline_value,
       (SELECT COALESCE(SUM(o.estimated_value * o.probability / 100.0), 0) FROM opportunity o
@@ -100,6 +101,7 @@ export async function computeMetrics({ salespersonIds = null, from, to }) {
     lost_reasons: lostReasons,
     // Snapshot "now", independent of the period:
     open_deals: n(row.open_deals),
+    total_deals: n(row.total_deals),
     overdue_deals: n(row.overdue_deals),
     stuck_deals: n(row.stuck_deals),
     pipeline_value: n(row.pipeline_value),
