@@ -92,7 +92,14 @@ export default function Opportunities() {
 
   const shown = useMemo(() => {
     const term = q.trim().toLowerCase();
-    const mine = (rows ?? []).filter((d) => ownerId === '' || d.owner_salesperson_id === ownerId);
+    // In ID order: TS-AK-0004, TS-AK-0005, ... (by the salesperson's letters, then the number).
+    const mine = (rows ?? [])
+      .filter((d) => ownerId === '' || d.owner_salesperson_id === ownerId)
+      .sort((a, b) => {
+        const [, pa = '', na = '0'] = a.code.split('-');
+        const [, pb = '', nb = '0'] = b.code.split('-');
+        return pa.localeCompare(pb) || Number(na) - Number(nb);
+      });
     if (!term) return mine;
     // The ID matches with or without its dashes: "tsg12" finds TS-G-0012.
     const compact = term.replace(/[^a-z0-9]/g, '');
