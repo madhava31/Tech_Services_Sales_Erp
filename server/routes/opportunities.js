@@ -27,6 +27,7 @@ import {
 } from '../crm/pipeline.js';
 import { assertCompanyAcceptsDeals, insertOpportunity, parseDealFields, replaceDealLinks, resolveDealContact } from '../crm/deals.js';
 import { auditHandover, transferDeals } from '../crm/handover.js';
+import { personName } from '../crm/notify.js';
 import { closeQuotationRequest, notifyQuotationReady, processQuotationRequests, requestStatus } from '../erp/quotationRequest.js';
 import { erpProblem } from '../erp/adapter.js';
 import { runErpSync } from '../erp/sync.js';
@@ -266,6 +267,46 @@ router.get('/quotation-requests', async (req, res) => {
         )
         .all(...params)
     );
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+// What salespeople have deleted from their own accounts, kept for the managers until one removes it for good.
+router.get('/deleted', async (req, res) => {
+  try {
+    if (!isManaging(req.user)) throw new HttpError(403, 'Only a manager can see deleted opportunities.');
+    res.json(
+      await db
+        .prepare(
+          `SELECT id, opportunity_id, code, title, company_name, owner_salesperson_id, owner_name, stage, estimated_value, reason, deleted_by_name, deleted_at
+           FROM deleted_opportunity ORDER BY deleted_at DESC, id DESC LIMIT 500`
+        )
+        .all()
+    );
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+// Removes the kept record for good.
+router.delete('/deleted/:id', async (req, res) => {
+  try {
+    if (!isManaging(req.user)) throw new HttpError(403, 'Only a manager can remove a deleted opportunity.');
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) throw new HttpError(400, 'Invalid id');
+    await db.transaction(async () => {
+      const row = await db.prepare(`DELETE FROM deleted_opportunity WHERE id = ? RETURNING code, title, company_name`).get(id);
+      if (!row) throw new HttpError(404, 'That deleted opportunity was not found.');
+      await recordAudit({
+        actorUserId: req.user.id,
+        action: 'opportunity.purged',
+        entityType: 'deleted_opportunity',
+        entityId: id,
+        summary: `Removed the deleted opportunity "${row.title}" (${row.code}, ${row.company_name}) for good`,
+      });
+    });
+    res.json({ deleted: true });
   } catch (err) {
     sendError(res, err);
   }
@@ -648,6 +689,16 @@ router.delete('/:id', requireCrmWriter, async (req, res) => {
         )
         .get(id, id);
       const { history, quotations } = copy;
+      // A salesperson's own delete takes it out of their account, but the managers keep a record of it.
+      // A manager's delete leaves nothing behind.
+      if (!isManaging(req.user)) {
+        await db
+          .prepare(
+            `INSERT INTO deleted_opportunity (opportunity_id, code, title, company_name, owner_salesperson_id, owner_name, stage, estimated_value, reason, deleted_by_user_id, deleted_by_name, snapshot)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)`
+          )
+          .run(id, opp.code, opp.title, opp.company_name, opp.owner_salesperson_id, opp.owner_name ?? null, opp.stage, opp.estimated_value ?? null, reason, req.user.id, await personName(req.user.id), JSON.stringify({ opportunity: opp, history, quotations }));
+      }
       await recordAudit({
         actorUserId: req.user.id,
         action: 'opportunity.deleted',

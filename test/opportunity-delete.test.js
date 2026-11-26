@@ -67,6 +67,31 @@ test('an admin can delete anyone’s opportunity', async () => {
   assert.equal((await admin.request('GET', `/api/opportunities/${deal.id}`)).status, 404);
 });
 
+test('a salesperson’s delete is kept for the managers; a manager’s delete leaves nothing; a manager can remove the record', async () => {
+  const mine = await newDeal(ravi, 'Kept Labs');
+  assert.equal((await remove(ravi.client, mine.id, { reason: 'Wrong customer' })).status, 200);
+  assert.equal((await ravi.client.request('GET', `/api/opportunities/${mine.id}`)).status, 404, 'gone from their account');
+  const kept = (await admin.request('GET', '/api/opportunities/deleted')).body.find((d) => d.code === mine.code);
+  assert.ok(kept, 'the admin sees it');
+  assert.equal(kept.reason, 'Wrong customer');
+  assert.equal(kept.owner_name, 'Ravi');
+  assert.equal(kept.deleted_by_name, 'Ravi');
+
+  // Salespeople cannot see or purge the list.
+  assert.equal((await ravi.client.request('GET', '/api/opportunities/deleted')).status, 403);
+  assert.equal((await ravi.client.request('DELETE', `/api/opportunities/deleted/${kept.id}`)).status, 403);
+
+  // A manager's own delete is not kept.
+  const theirs = await newDeal(priya, 'Gone Labs');
+  assert.equal((await remove(admin, theirs.id)).status, 200);
+  assert.equal((await admin.request('GET', '/api/opportunities/deleted')).body.some((d) => d.code === theirs.code), false);
+
+  // Removing the record deletes it from the database.
+  assert.equal((await admin.request('DELETE', `/api/opportunities/deleted/${kept.id}`)).status, 200);
+  assert.equal((await query(`SELECT COUNT(*)::int AS n FROM deleted_opportunity WHERE id = $1`, [kept.id]))[0].n, 0);
+  assert.equal((await admin.request('DELETE', `/api/opportunities/deleted/${kept.id}`)).status, 404);
+});
+
 test('a won opportunity cannot be deleted', async () => {
   const deal = await newDeal(ravi, 'Won Labs');
   const won = await ravi.client.request('POST', `/api/opportunities/${deal.id}/stage`, { stage: 'won', won_value: 1000, close_reason: 'Good price' });

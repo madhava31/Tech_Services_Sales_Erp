@@ -305,6 +305,9 @@ export const api = {
     ) => post<Opportunity>(`/opportunities/${id}/stage`, data),
     // The owner or a manager deletes at once; a won opportunity can't be deleted.
     remove: (id: number, reason?: string) => request<{ deleted: boolean }>(`/opportunities/${id}`, { method: 'DELETE', body: JSON.stringify({ reason }) }),
+    // What salespeople deleted from their own accounts, for the managers.
+    deleted: () => request<DeletedOpportunity[]>('/opportunities/deleted'),
+    purgeDeleted: (id: number) => request<{ deleted: boolean }>(`/opportunities/deleted/${id}`, { method: 'DELETE' }),
     addQuotation: (id: number, data: QuotationInput) => post<QuotationLink>(`/opportunities/${id}/quotations`, data),
     updateQuotation: (linkId: number, data: Partial<QuotationInput>) => put<QuotationLink>(`/quotation-links/${linkId}`, data),
   },
@@ -780,6 +783,21 @@ export interface Opportunity {
   created_at: string;
   updated_at: string;
   quotation_count: number;
+}
+
+export interface DeletedOpportunity {
+  id: number;
+  opportunity_id: number;
+  code: string;
+  title: string;
+  company_name: string;
+  owner_salesperson_id: number | null;
+  owner_name: string | null;
+  stage: Stage;
+  estimated_value: number | string | null;
+  reason: string | null;
+  deleted_by_name: string | null;
+  deleted_at: string;
 }
 
 export interface DealFilters {
