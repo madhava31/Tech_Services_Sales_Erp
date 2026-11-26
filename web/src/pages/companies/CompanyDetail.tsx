@@ -575,7 +575,7 @@ function CompanyPage({ id }: { id: number }) {
             {dealError && <Notice tone="error">{dealError}</Notice>}
             {owner.chooses && <OwnerField value={owner.ownerId} onChange={owner.setOwnerId} />}
             <CompanyOwnerNote />
-            <DealFields companyId={c.id} value={dealForm} onChange={(patch) => setDealForm({ ...dealForm, ...patch })} withStage />
+            <DealFields companyId={c.id} knownContacts={c.contacts} value={dealForm} onChange={(patch) => setDealForm({ ...dealForm, ...patch })} withStage />
             <div className="flex gap-2">
               <Button type="submit" size="sm" disabled={dealBusy || !owner.ready || !dealDraftComplete(dealForm)}>
                 Open opportunity

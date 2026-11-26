@@ -405,8 +405,11 @@ export default function DealFields({
   onChange,
   keep,
   withStage = false,
+  knownContacts,
 }: {
   companyId: number;
+  // The company's contacts when the page already has them: used at once, and kept up to date with the page.
+  knownContacts?: Contact[];
   value: DealDraft;
   onChange: (patch: Partial<DealDraft>) => void;
   keep?: Pick<OpportunityDetail, 'products' | 'segments' | 'oems'>;
@@ -419,9 +422,17 @@ export default function DealFields({
   const [segments, setSegments] = useState<NamedOption[]>([]);
   const [productsByOem, setProductsByOem] = useState<Record<string, Product[]>>({});
 
+  const [contactsFailed, setContactsFailed] = useState(false);
   useEffect(() => {
-    api.companies.get(companyId).then((c) => setContacts(c.contacts)).catch(() => setContacts([]));
+    setContactsFailed(false);
+    api.companies
+      .get(companyId)
+      .then((c) => setContacts(c.contacts))
+      .catch(() => setContactsFailed(true));
   }, [companyId]);
+  useEffect(() => {
+    if (knownContacts) setContacts(knownContacts);
+  }, [knownContacts]);
   useEffect(() => {
     api.catalogue.oems().then(setOems).catch(() => setOems([]));
     api.catalogue.segments().then(setSegments).catch(() => setSegments([]));
@@ -526,6 +537,7 @@ export default function DealFields({
           ))}
           <option value={NEW_CONTACT}>+ Add contact person</option>
         </SelectField>
+        {contactsFailed && contacts.length === 0 && <p className="ts-muted m-0 mt-1 text-[13px]">Could not load this company’s contacts. Reload the page, or add one with “+ Add contact person”.</p>}
       </div>
       {value.contactId === NEW_CONTACT && (
         <fieldset className="ts-span2 ts-fgrid ts-g2 !mt-0 rounded-lg border border-line p-3">

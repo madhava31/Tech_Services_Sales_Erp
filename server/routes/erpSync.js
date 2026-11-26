@@ -5,6 +5,7 @@ import { HttpError, sendError } from '../crm/access.js';
 import { optionalId } from '../crm/fields.js';
 import { normalizeCompanyName } from '../crm/normalize.js';
 import { canonicalState } from '../crm/states.js';
+import { contactFields, findContactByPhone, insertContact } from '../crm/contacts.js';
 import { erpProblem } from '../erp/adapter.js';
 import { runErpSync } from '../erp/sync.js';
 import { processQuotationRequests } from '../erp/quotationRequest.js';
@@ -99,6 +100,19 @@ router.post('/customers/:id/add', async (req, res) => {
         )
         .run(customer.name, normalizeCompanyName(customer.name), canonicalState(customer.state), customer.address, customer.phone, customer.email, customer.contact_person, customer.gstin, customer.id, req.user.id, req.user.id);
       await recordAudit({ actorUserId: req.user.id, action: 'company.created', entityType: 'company', entityId: info.lastInsertRowid, summary: `Added company ${customer.name} from the ERP` });
+      // The ERP's contact name becomes a real contact, so it shows in the "Contact person" list on a new opportunity.
+      const contactName = (customer.contact_person || '').trim();
+      if (contactName) {
+        let fields;
+        try {
+          fields = contactFields({ name: contactName, phone: customer.phone, email: customer.email });
+        } catch {
+          // The ERP's phone or email is not in a usable form: keep the name alone.
+          fields = contactFields({ name: contactName });
+        }
+        if (fields.phone && (await findContactByPhone(fields.phone))) fields = { ...fields, phone: null };
+        await insertContact({ companyId: info.lastInsertRowid, fields, userId: req.user.id });
+      }
       return info.lastInsertRowid;
     });
     res.status(201).json({ id });
